@@ -32,7 +32,11 @@ redis-cluster:
   enabled: false
 redis:
   enabled: true
+  image:
+    tag: "7.2"
 postgresql:
   enabled: true
+  image:
+    tag: "16"
 postgresql-ha:
   enabled: false

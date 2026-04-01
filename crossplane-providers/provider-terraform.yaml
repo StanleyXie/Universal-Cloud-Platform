@@ -1,0 +1,18 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-terraform
+spec:
+  package: xpkg.upbound.io/upbound/provider-terraform:v0
+  packagePullPolicy: IfNotPresent
+  revisionActivationPolicy: Automatic
+  controllerConfigRef:
+    name: provider-terraform-config
+---
+apiVersion: pkg.crossplane.io/v1alpha1
+kind: ControllerConfig
+metadata:
+  name: provider-terraform-config
+spec:
+  args:
+    - --enable-management-policies

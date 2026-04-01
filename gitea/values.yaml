@@ -1,0 +1,38 @@
+gitea:
+  admin:
+    username: stanley
+    password: "changeme123!"
+    email: stanley@local
+
+service:
+  http:
+    type: NodePort
+    port: 3000
+    nodePort: 30300
+  ssh:
+    type: NodePort
+    port: 22
+    nodePort: 30022
+
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Disable unnecessary features for homelab
+redis-cluster:
+  enabled: false
+redis:
+  enabled: true
+postgresql:
+  enabled: true
+postgresql-ha:
+  enabled: false

@@ -3,6 +3,15 @@ gitea:
     username: stanley
     password: "changeme123!"
     email: stanley@local
+  config:
+    database:
+      DB_TYPE: sqlite3
+    cache:
+      ADAPTER: memory
+    queue:
+      TYPE: level
+    session:
+      PROVIDER: memory
 
 service:
   http:
@@ -27,16 +36,12 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# Disable unnecessary features for homelab
+# Use SQLite3 - no external dependencies needed for homelab
 redis-cluster:
   enabled: false
 redis:
-  enabled: true
-  image:
-    tag: "7.2"
+  enabled: false
 postgresql:
-  enabled: true
-  image:
-    tag: "16"
+  enabled: false
 postgresql-ha:
   enabled: false

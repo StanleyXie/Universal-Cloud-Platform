@@ -14,7 +14,7 @@ spec:
       helm:
         valueFiles:
           - $values/gitea/values.yaml
-    - repoURL: https://github.com/StanleyXie/Universal-Cloud-Platform
+    - repoURL: http://gitea-http.gitea.svc:3000/stanley/platform
       targetRevision: HEAD
       ref: values
   destination:

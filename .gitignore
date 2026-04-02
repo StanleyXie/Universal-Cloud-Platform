@@ -1,0 +1,3 @@
+# Credential files — never commit these
+scripts/gcp-sa-key.json
+scripts/setup-credentials.sh

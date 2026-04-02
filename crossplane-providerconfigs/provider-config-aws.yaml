@@ -1,0 +1,19 @@
+# AWS ProviderConfig
+# References secret 'aws-creds' in crossplane-system namespace.
+# Create the secret first — see scripts/setup-credentials.sh
+#
+# Secret format (AWS credentials file):
+#   [default]
+#   aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+#   aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: aws-creds
+      key: credentials

@@ -1,0 +1,27 @@
+# Terraform ProviderConfig
+# Uses the Kubernetes backend — state is stored as Kubernetes secrets
+# in crossplane-system. No external credentials needed.
+#
+# To use a Terraform Cloud backend instead, replace the backend block with:
+#   terraform {
+#     cloud {
+#       organization = "my-org"
+#       workspaces { name = "crossplane" }
+#     }
+#   }
+# and create a secret 'terraform-cloud-creds' with key 'credentials'
+# containing: credentials "app.terraform.io" { token = "..." }
+apiVersion: tf.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  # Kubernetes backend: state stored as K8s secrets, no external dependency
+  configuration: |
+    terraform {
+      backend "kubernetes" {
+        secret_suffix     = "providerconfig-default"
+        namespace         = "crossplane-system"
+        in_cluster_config = true
+      }
+    }

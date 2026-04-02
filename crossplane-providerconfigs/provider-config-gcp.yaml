@@ -1,0 +1,26 @@
+# GCP ProviderConfig
+# References secret 'gcp-creds' in crossplane-system namespace.
+# Create the secret first — see scripts/setup-credentials.sh
+#
+# Secret format: raw service account JSON key file
+#   {
+#     "type": "service_account",
+#     "project_id": "my-project",
+#     "private_key_id": "...",
+#     "private_key": "-----BEGIN RSA PRIVATE KEY-----\n...",
+#     "client_email": "crossplane@my-project.iam.gserviceaccount.com",
+#     ...
+#   }
+apiVersion: gcp.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  # Replace with your GCP project ID
+  projectID: REPLACE_WITH_GCP_PROJECT_ID
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: gcp-creds
+      key: credentials

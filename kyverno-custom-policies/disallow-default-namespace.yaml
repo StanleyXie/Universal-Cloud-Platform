@@ -1,0 +1,29 @@
+# Prevents workloads from being deployed to the default namespace.
+# Enforced — there is no legitimate reason to use default in this cluster.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-default-namespace
+  annotations:
+    policies.kyverno.io/title: Disallow Default Namespace
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >
+      All workloads must be deployed to a named namespace. Using the default
+      namespace makes it hard to apply RBAC and resource quotas.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-namespace
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Deploying to the 'default' namespace is not allowed. Use a dedicated namespace."
+        pattern:
+          metadata:
+            namespace: "?*"
+          spec:
+            (namespace): "!default"

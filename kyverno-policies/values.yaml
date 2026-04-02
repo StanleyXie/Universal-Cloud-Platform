@@ -1,0 +1,8 @@
+# Kyverno Pod Security Standards — Baseline profile
+# All policies start in Audit mode. Switch to Enforce once violations are reviewed.
+# Monitor: kubectl get clusterpolicyreport -A
+
+podSecurityStandard: baseline
+podSecuritySeverity: medium
+validationFailureAction: Audit
+background: true

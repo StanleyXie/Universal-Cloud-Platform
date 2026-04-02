@@ -1,0 +1,41 @@
+# Ensures all containers declare CPU and memory limits.
+# Audit mode — review violations before enforcing.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >
+      All containers must specify CPU and memory limits to prevent resource
+      exhaustion on the homelab cluster nodes.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-container-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      validate:
+        message: "Container '{{ request.object.metadata.name }}' must specify CPU and memory limits."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.resources.limits.memory || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.limits.cpu || '' }}"
+                    operator: Equals
+                    value: ""

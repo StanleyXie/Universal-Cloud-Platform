@@ -1,0 +1,26 @@
+# Blocks CVE-2020-8554: prevents MITM attacks via Service.externalIPs
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-external-ips
+  annotations:
+    policies.kyverno.io/title: Restrict External IPs
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >
+      Prevents Services from using externalIPs which can be used for MITM attacks
+      (CVE-2020-8554). No workload in this cluster requires externalIPs.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-external-ips
+      match:
+        any:
+          - resources:
+              kinds:
+                - Service
+      validate:
+        message: "Service externalIPs are not allowed (CVE-2020-8554)."
+        pattern:
+          spec:
+            =(externalIPs): "null"

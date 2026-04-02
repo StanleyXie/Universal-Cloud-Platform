@@ -1,0 +1,31 @@
+# Audit policy: Crossplane managed resources should have owner labels
+# for traceability. Helps identify which team/project owns a cloud resource.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-crossplane-labels
+  annotations:
+    policies.kyverno.io/title: Require Crossplane Resource Labels
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >
+      All Crossplane managed resources should carry an 'owner' and 'environment'
+      label for cost attribution and traceability.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-managed-resource-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - "*.aws.upbound.io/*"
+                - "*.gcp.upbound.io/*"
+                - "*.azure.upbound.io/*"
+      validate:
+        message: "Crossplane managed resources must have 'owner' and 'environment' labels."
+        pattern:
+          metadata:
+            labels:
+              owner: "?*"
+              environment: "?*"

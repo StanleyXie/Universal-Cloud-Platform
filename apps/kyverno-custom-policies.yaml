@@ -18,9 +18,9 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      - RespectIgnoreDifferences=true
     syncOptions:
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
     - group: kyverno.io
       kind: ClusterPolicy

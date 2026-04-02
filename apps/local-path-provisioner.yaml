@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: http://gitea-http.gitea.svc:3000/stanley/platform
+    repoURL: https://github.com/StanleyXie/Universal-Cloud-Platform
     targetRevision: HEAD
     path: local-path-provisioner
   destination:

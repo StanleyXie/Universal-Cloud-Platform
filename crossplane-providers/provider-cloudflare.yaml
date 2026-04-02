@@ -1,8 +1,15 @@
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-cloudflare
-spec:
-  package: xpkg.upbound.io/wildbitca/provider-upjet-cloudflare:v0.1.0
-  packagePullPolicy: IfNotPresent
-  revisionActivationPolicy: Automatic
+# Cloudflare provider is temporarily disabled.
+# Both wildbitca/provider-upjet-cloudflare:v0.1.0 and v0.2.0 contain a CRD
+# (tlssettings.hostname.upjet-cloudflare.m.upbound.io) with an invalid CEL
+# validation rule that Kubernetes rejects. Re-enable when a fixed version ships.
+#
+# To re-enable, uncomment and update the version:
+#
+# apiVersion: pkg.crossplane.io/v1
+# kind: Provider
+# metadata:
+#   name: provider-cloudflare
+# spec:
+#   package: xpkg.upbound.io/wildbitca/provider-upjet-cloudflare:v0.2.0
+#   packagePullPolicy: IfNotPresent
+#   revisionActivationPolicy: Automatic

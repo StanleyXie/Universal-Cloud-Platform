@@ -3,6 +3,6 @@ kind: Provider
 metadata:
   name: provider-cloudflare
 spec:
-  package: xpkg.upbound.io/wildbitca/provider-upjet-cloudflare:v0.2.0
+  package: xpkg.upbound.io/wildbitca/provider-upjet-cloudflare:v0.1.0
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic

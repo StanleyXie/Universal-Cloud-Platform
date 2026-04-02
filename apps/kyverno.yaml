@@ -32,8 +32,7 @@ spec:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       jqPathExpressions:
-        - .spec.versions[].schema
-        - .spec.conversion
+        - .spec
         - .metadata.annotations
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration

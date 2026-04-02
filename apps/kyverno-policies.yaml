@@ -24,5 +24,12 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      - RespectIgnoreDifferences=true
     syncOptions:
       - ServerSideApply=true
+  ignoreDifferences:
+    - group: kyverno.io
+      kind: ClusterPolicy
+      jqPathExpressions:
+        - .spec
+        - .status

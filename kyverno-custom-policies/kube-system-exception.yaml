@@ -1,7 +1,9 @@
-# Suppress expected policy violations for kube-system workloads.
-# kube-proxy, kube-vip, kube-scheduler etc. legitimately require host
-# namespaces, hostPath volumes, privileged mode, and extra capabilities
-# to function. These are not security issues — they are system components.
+# Suppress expected policy violations for system-level workloads.
+# kube-proxy, kube-vip, kube-scheduler, Cilium etc. legitimately require host
+# namespaces, hostPath volumes, privileged mode, extra capabilities, and SELinux/seccomp
+# relaxations to function. local-path-provisioner and Helm-managed platform components
+# (ArgoCD, Crossplane providers) do not define resource limits by default.
+# These are not security issues — they are system components or upstream Helm defaults.
 apiVersion: kyverno.io/v2
 kind: PolicyException
 metadata:
@@ -29,6 +31,14 @@ spec:
       ruleNames:
         - host-ports-none
         - autogen-host-ports-none
+    - policyName: disallow-selinux
+      ruleNames:
+        - selinux-type
+        - autogen-selinux-type
+    - policyName: restrict-seccomp
+      ruleNames:
+        - check-seccomp
+        - autogen-check-seccomp
     - policyName: require-resource-limits
       ruleNames:
         - check-container-limits
@@ -38,3 +48,6 @@ spec:
       - resources:
           namespaces:
             - kube-system
+            - local-path-storage
+            - argocd
+            - crossplane-system

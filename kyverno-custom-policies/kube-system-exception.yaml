@@ -1,0 +1,40 @@
+# Suppress expected policy violations for kube-system workloads.
+# kube-proxy, kube-vip, kube-scheduler etc. legitimately require host
+# namespaces, hostPath volumes, privileged mode, and extra capabilities
+# to function. These are not security issues — they are system components.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: kube-system-exception
+  namespace: kyverno
+spec:
+  exceptions:
+    - policyName: disallow-host-namespaces
+      ruleNames:
+        - host-namespaces
+        - autogen-host-namespaces
+    - policyName: disallow-host-path
+      ruleNames:
+        - host-path
+        - autogen-host-path
+    - policyName: disallow-privileged-containers
+      ruleNames:
+        - privileged-containers
+        - autogen-privileged-containers
+    - policyName: disallow-capabilities
+      ruleNames:
+        - adding-capabilities
+        - autogen-adding-capabilities
+    - policyName: disallow-host-ports
+      ruleNames:
+        - host-ports-none
+        - autogen-host-ports-none
+    - policyName: require-resource-limits
+      ruleNames:
+        - check-container-limits
+        - autogen-check-container-limits
+  match:
+    any:
+      - resources:
+          namespaces:
+            - kube-system

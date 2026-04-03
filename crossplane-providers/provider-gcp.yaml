@@ -6,3 +6,5 @@ spec:
   package: xpkg.upbound.io/upbound/provider-family-gcp:v1
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
+  runtimeConfigRef:
+    name: default

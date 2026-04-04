@@ -1,28 +1,25 @@
-# Cloudflare provider — patched fork pending publish.
+# Cloudflare provider — disabled, waiting for official release.
 #
-# Status (2026-04-03):
+# Status (2026-04-04):
 #   No production-ready xpkg exists in the Crossplane ecosystem.
-#   Plan: fork wildbitca/provider-upjet-cloudflare, fix CEL bug in 4 CRDs,
-#         publish to ghcr.io/stanleyxie/provider-upjet-cloudflare:v0.1.0-patched.
 #
-# CEL bug: wildbitca v0.1.0 has an invalid has() rule on a dyn-typed `value` field
-#   in 4 CRD files (tls/zone settings). Fix: remove the 2-line validation rule.
-#   Affected files in the fork:
-#     package/crds/hostname.upjet-cloudflare.m.upbound.io_tlssettings.yaml
-#     package/crds/hostname.upjet-cloudflare.upbound.io_tlssettings.yaml
-#     package/crds/zone.upjet-cloudflare.m.upbound.io_settings.yaml
-#     package/crds/zone.upjet-cloudflare.upbound.io_settings.yaml
+#   wildbitca/provider-upjet-cloudflare: multiple CRD generation defects
+#     beyond the original CEL bug — missing Snippet CRD, kind/plural naming
+#     mismatches. Not suitable for use without full Upjet code regeneration.
 #
-# Long-term: switch to crossplane-contrib/provider-upjet-cloudflare when it publishes:
-#   https://github.com/crossplane-contrib/provider-upjet-cloudflare/releases
+#   crossplane-contrib/provider-upjet-cloudflare: official successor, actively
+#     maintained, but no versioned release or published xpkg yet.
+#     Monitor: https://github.com/crossplane-contrib/provider-upjet-cloudflare/releases
 #
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-cloudflare
-spec:
-  package: ghcr.io/stanleyxie/provider-upjet-cloudflare:v0.1.2-patched
-  packagePullPolicy: IfNotPresent
-  revisionActivationPolicy: Automatic
-  runtimeConfigRef:
-    name: default
+# Re-enable when crossplane-contrib publishes a release:
+#
+# apiVersion: pkg.crossplane.io/v1
+# kind: Provider
+# metadata:
+#   name: provider-cloudflare
+# spec:
+#   package: xpkg.upbound.io/crossplane-contrib/provider-upjet-cloudflare:<version>
+#   packagePullPolicy: IfNotPresent
+#   revisionActivationPolicy: Automatic
+#   runtimeConfigRef:
+#     name: default

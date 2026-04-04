@@ -1,22 +1,28 @@
-# Cloudflare provider is disabled — no production-ready xpkg release exists.
+# Cloudflare provider — patched fork pending publish.
 #
-# Evaluated options (2026-04-03):
-#   - wildbitca/provider-upjet-cloudflare: 0 stars/forks, experimental, CEL bug
-#   - crossplane-contrib/provider-cloudflare: archived, no xpkg release
-#   - crossplane-contrib/provider-upjet-cloudflare: official successor, 251 CRDs,
-#     actively maintained — but no versioned release published yet
-#   - cdloh/provider-cloudflare: abandoned since 2024
+# Status (2026-04-03):
+#   No production-ready xpkg exists in the Crossplane ecosystem.
+#   Plan: fork wildbitca/provider-upjet-cloudflare, fix CEL bug in 4 CRDs,
+#         publish to ghcr.io/stanleyxie/provider-upjet-cloudflare:v0.1.0-patched.
 #
-# Re-enable when crossplane-contrib/provider-upjet-cloudflare publishes a release:
+# CEL bug: wildbitca v0.1.0 has an invalid has() rule on a dyn-typed `value` field
+#   in 4 CRD files (tls/zone settings). Fix: remove the 2-line validation rule.
+#   Affected files in the fork:
+#     package/crds/hostname.upjet-cloudflare.m.upbound.io_tlssettings.yaml
+#     package/crds/hostname.upjet-cloudflare.upbound.io_tlssettings.yaml
+#     package/crds/zone.upjet-cloudflare.m.upbound.io_settings.yaml
+#     package/crds/zone.upjet-cloudflare.upbound.io_settings.yaml
+#
+# Long-term: switch to crossplane-contrib/provider-upjet-cloudflare when it publishes:
 #   https://github.com/crossplane-contrib/provider-upjet-cloudflare/releases
 #
-# apiVersion: pkg.crossplane.io/v1
-# kind: Provider
-# metadata:
-#   name: provider-cloudflare
-# spec:
-#   package: xpkg.upbound.io/crossplane-contrib/provider-upjet-cloudflare:<version>
-#   packagePullPolicy: IfNotPresent
-#   revisionActivationPolicy: Automatic
-#   runtimeConfigRef:
-#     name: default
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-cloudflare
+spec:
+  package: ghcr.io/stanleyxie/provider-upjet-cloudflare:v0.1.0-patched
+  packagePullPolicy: IfNotPresent
+  revisionActivationPolicy: Automatic
+  runtimeConfigRef:
+    name: default

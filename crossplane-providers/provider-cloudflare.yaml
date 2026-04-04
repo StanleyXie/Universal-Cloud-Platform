@@ -21,7 +21,7 @@ kind: Provider
 metadata:
   name: provider-cloudflare
 spec:
-  package: ghcr.io/stanleyxie/provider-upjet-cloudflare:v0.1.1-patched
+  package: ghcr.io/stanleyxie/provider-upjet-cloudflare:v0.1.2-patched
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
   runtimeConfigRef:

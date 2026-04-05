@@ -7,14 +7,29 @@ spec:
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
   runtimeConfigRef:
-    name: default
-  controllerConfigRef:
-    name: provider-terraform-config
+    name: terraform
 ---
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+# Terraform-specific DeploymentRuntimeConfig.
+# Passes --enable-management-policies to the provider controller.
+# ControllerConfig (pkg.crossplane.io/v1alpha1) is deprecated — replaced by DeploymentRuntimeConfig.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
-  name: provider-terraform-config
+  name: terraform
 spec:
-  args:
-    - --enable-management-policies
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              args:
+                - --enable-management-policies
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi

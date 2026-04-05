@@ -1,0 +1,22 @@
+# Cilium L2 Load Balancer IP Pool for bare metal
+# Assigns IPs from 192.168.32.100-192.168.32.110 to LoadBalancer Services
+# Cilium announces these via L2 (ARP) on the LAN — no MetalLB needed
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: platform-lb-pool
+spec:
+  blocks:
+    - start: "192.168.32.100"
+      stop: "192.168.32.110"
+---
+# L2 announcement policy — advertise LB IPs via ARP on all nodes
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: platform-l2-policy
+spec:
+  interfaces:
+    - ^enp.*
+  externalIPs: false
+  loadBalancerIPs: true

@@ -10,3 +10,10 @@ kubeProxyReplacement: true
 # Requires Gateway API CRDs to be installed first (wave 1, gateway-api app)
 gatewayAPI:
   enabled: true
+
+# L2 announcements — assigns IPs to LoadBalancer Services on bare metal via ARP
+# IP pool defined in gateway-api/lb-ip-pool.yaml (192.168.32.100-110)
+l2announcements:
+  enabled: true
+l2podAnnouncements:
+  enabled: false

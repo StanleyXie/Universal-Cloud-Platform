@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Creates the searxng-secret in the common-svc namespace.
-# Contains a complete settings.yml with a generated secret_key.
+# The chart injects the value as SEARXNG_SECRET env var for the secret_key.
 # Run once before ArgoCD deploys SearXNG, or to rotate the key.
 set -euo pipefail
 
@@ -14,24 +14,7 @@ kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -
 
 kubectl create secret generic "$SECRET_NAME" \
   --namespace "$NAMESPACE" \
-  --from-literal=settings.yml="$(cat <<EOF
-use_default_settings: true
-
-server:
-  secret_key: "${SECRET_KEY}"
-  limiter: false
-  image_proxy: false
-
-search:
-  safe_search: 0
-  autocomplete: ""
-
-ui:
-  default_theme: simple
-  default_language: "en"
-  query_in_title: false
-EOF
-)" \
+  --from-literal=searxng-secret="$SECRET_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Secret '${SECRET_NAME}' created in namespace '${NAMESPACE}'."

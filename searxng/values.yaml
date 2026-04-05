@@ -3,19 +3,65 @@ image:
   tag: "2026.4.3-53141be38"
   pullPolicy: IfNotPresent
 
-env:
-  INSTANCE_NAME: "AOS Search"
-  BASE_URL: "http://search.aos.local/"
-  AUTOCOMPLETE: "false"
+# Use existing secret created by scripts/setup-searxng-secret.sh
+secret:
+  create: false
+  existingSecret: "searxng-secret"
+  secretKey: "searxng-secret"
 
-controller:
-  strategy: RollingUpdate
+config:
+  general:
+    instance_name: "AOS Search"
+    enable_metrics: false
+
+  search:
+    safe_search: 0
+    autocomplete: ""
+
+  server:
+    limiter: false
+    public_instance: false
+    image_proxy: false
+    method: "POST"
+    base_url: "http://search.aos.local/"
+
+  ui:
+    default_theme: simple
+    default_locale: "en"
+
+  engines:
+    - name: duckduckgo
+      disabled: false
+    - name: google
+      disabled: false
+    - name: wikipedia
+      disabled: false
+    - name: github
+      disabled: false
+    - name: stackoverflow
+      disabled: false
+
+# Gateway API HTTPRoute — native chart support
+route:
+  enabled: true
+  parentRefs:
+    - name: platform-gateway
+      namespace: networking
+  hostnames:
+    - "search.aos.local"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
 
 service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
   main:
-    ports:
-      http:
-        port: 8080
+    enabled: false
 
 resources:
   requests:
@@ -24,70 +70,3 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
-
-persistence:
-  config:
-    enabled: false
-
-ingress:
-  main:
-    enabled: false
-
-# secret_key is intentionally absent — mounted from searxng-secret k8s Secret
-# at /etc/searxng/settings.yml, overriding this chart ConfigMap.
-# Create the secret before deploying:
-#   platform/scripts/setup-searxng-secret.sh
-searxng:
-  config:
-    use_default_settings: true
-    search:
-      safe_search: 0
-      autocomplete: ""
-    ui:
-      default_theme: simple
-      default_language: "en"
-
-# Mount the Secret (created by setup-searxng-secret.sh) over the chart ConfigMap
-# The Secret contains a complete settings.yml including the generated secret_key
-extraVolumes:
-  - name: searxng-secret-settings
-    secret:
-      secretName: searxng-secret
-      items:
-        - key: settings.yml
-          path: settings.yml
-
-extraVolumeMounts:
-  - name: searxng-secret-settings
-    mountPath: /etc/searxng/settings.yml
-    subPath: settings.yml
-    readOnly: true
-
-probes:
-  readiness:
-    custom: true
-    spec:
-      httpGet:
-        path: /healthz
-        port: 8080
-      initialDelaySeconds: 10
-      periodSeconds: 10
-  liveness:
-    custom: true
-    spec:
-      httpGet:
-        path: /healthz
-        port: 8080
-      initialDelaySeconds: 30
-      periodSeconds: 30
-  startup:
-    custom: true
-    spec:
-      httpGet:
-        path: /healthz
-        port: 8080
-      failureThreshold: 30
-      periodSeconds: 5
-
-redis:
-  enabled: false

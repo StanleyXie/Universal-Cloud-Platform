@@ -1,0 +1,133 @@
+name: Security & Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write  # for uploading SARIF results
+
+jobs:
+  # ── 1. Secret scanning ───────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret Detection (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required by gitleaks
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 2. YAML linting ──────────────────────────────────────────────────────────
+  yaml-lint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Run yamllint
+        run: |
+          yamllint -d '{
+            extends: default,
+            rules: {
+              line-length: {max: 120, level: warning},
+              comments: disable,
+              truthy: {allowed-values: ["true", "false", "yes", "no"], check-keys: false}
+            }
+          }' \
+          $(find . -name "*.yaml" -o -name "*.yml" | grep -v ".github/")
+
+  # ── 3. Kubernetes manifest validation ────────────────────────────────────────
+  manifest-validate:
+    name: Manifest Validation (kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate Kubernetes manifests
+        run: |
+          find . -name "*.yaml" -o -name "*.yml" | \
+          grep -v ".github/" | \
+          grep -v "kustomization.yaml" | \
+          xargs kubeconform \
+            -kubernetes-version 1.35.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas \
+            -strict \
+            -summary
+
+  # ── 4. Kyverno policy linting ─────────────────────────────────────────────────
+  kyverno-lint:
+    name: Kyverno Policy Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Kyverno CLI
+        run: |
+          curl -sSLo kyverno.tar.gz \
+            https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli_latest_linux_x86_64.tar.gz
+          tar -xzf kyverno.tar.gz
+          sudo mv kyverno /usr/local/bin/
+
+      - name: Lint Kyverno ClusterPolicies
+        run: |
+          kyverno lint policy \
+            kyverno/policies/ \
+            kyverno-custom-policies/ \
+            kyverno-policies/
+
+  # ── 5. Shell script analysis ──────────────────────────────────────────────────
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning
+
+  # ── 6. ArgoCD Application manifest check ─────────────────────────────────────
+  argocd-app-lint:
+    name: ArgoCD Application Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate ArgoCD Application manifests
+        run: |
+          find apps/ argocd/ -name "*.yaml" -o -name "*.yml" | \
+          xargs kubeconform \
+            -kubernetes-version 1.35.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas \
+            -summary

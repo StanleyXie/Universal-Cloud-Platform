@@ -51,3 +51,4 @@ spec:
             - local-path-storage
             - argocd
             - crossplane-system
+            - monitoring

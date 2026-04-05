@@ -1,0 +1,21 @@
+# Allow externalIPs on the Cilium Gateway LoadBalancer service in the networking namespace.
+# The restrict-external-ips policy (CVE-2020-8554) blocks Services with externalIPs.
+# In this homelab LAN (192.168.32.0/24), externalIPs on the platform-gateway service
+# is safe — nodes are not publicly reachable and the IPs are local node addresses.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: gateway-external-ip-exception
+  namespace: kyverno
+spec:
+  exceptions:
+    - policyName: restrict-external-ips
+      ruleNames:
+        - check-external-ips
+  match:
+    any:
+      - resources:
+          kinds:
+            - Service
+          namespaces:
+            - networking

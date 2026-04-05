@@ -1,6 +1,6 @@
 # Universal Cloud Platform — Architecture Overview
 
-**Last updated:** 2026-04-05  
+**Last updated:** 2026-04-05 (CI all green)  
 **Cluster:** AOS01 / AOS02 / AOS03 · Kubernetes v1.35.3 · 3-node HA  
 **Repo:** `https://github.com/StanleyXie/Universal-Cloud-Platform`
 
@@ -304,6 +304,17 @@ flowchart TB
     JOBS    -- "any red"   --> NOK
 ```
 
+**Status: all 6 jobs passing.** Known issues resolved during initial setup:
+
+| Symptom | Root Cause | Fix |
+|---------|-----------|-----|
+| kubeconform exit 123 | `/releases/latest` redirect not followed | Pinned to explicit `v0.7.0` URL |
+| kubeconform `missing 'kind' key` | Helm `values.yaml` picked up by `find` | Excluded `values.yaml` from find |
+| ClusterRole schema rejection | Invalid `spec: {}` on `cilium-l2-rbac.yaml` | Removed `spec: {}` |
+| Kyverno CLI tar error | Binary extracted as `kyverno`, conflicted with `kyverno/` checkout dir | Extract to `/tmp/kyverno-cli/` |
+| `kyverno lint` unknown command | `lint` subcommand removed in v1.17 | Use `kyverno apply --resource test/sample-pod.yaml` |
+| yamllint `document-start` warnings | Missing `---` on K8s manifests (not required) | Disabled `document-start` rule |
+
 ---
 
 ## 8. Services
@@ -345,6 +356,7 @@ Universal-Cloud-Platform/  (github.com/StanleyXie/Universal-Cloud-Platform)
 ├── cilium/                        ← Cilium Helm values (CNI + Gateway API + L2)
 ├── crossplane/                    ← Crossplane Helm values
 ├── crossplane-providers/          ← Provider CRs (AWS/GCP/Azure/Terraform)
+│   └── provider-terraform.yaml    ← uses DeploymentRuntimeConfig (ControllerConfig deprecated v1.16+)
 ├── crossplane-providerconfigs/    ← ProviderConfig CRs (credential bindings)
 ├── gateway-api/                   ← CRD kustomization + Gateway + L2 pool + RBAC fix
 ├── kyverno/                       ← Kyverno Helm values
@@ -360,6 +372,9 @@ Universal-Cloud-Platform/  (github.com/StanleyXie/Universal-Cloud-Platform)
 ├── bootstrap/                     ← Day-0 scripts (run once)
 │   ├── bootstrap-argocd.sh          Helm install ArgoCD + apply root app
 │   └── k8s/                         Node setup scripts (kubeadm init/join)
+│
+├── test/
+│   └── sample-pod.yaml            ← Minimal Pod for Kyverno CI policy checks
 │
 └── docs/
     ├── plans/                     ← Architecture & design docs

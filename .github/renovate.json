@@ -1,0 +1,117 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Vancouver",
+  "schedule": ["every weekend"],
+  "labels": ["renovate"],
+  "assignees": ["StanleyXie"],
+
+  "packageRules": [
+
+    // ── Platform core: ArgoCD, Cilium, Kyverno, Crossplane ─────────────────────
+    // These require manual review — chart upgrades can have breaking changes.
+    {
+      "description": "Platform core components — batch weekly, no automerge",
+      "matchManagers": ["argocd", "helm-values"],
+      "matchPackageNames": [
+        "argo-cd",
+        "cilium",
+        "kyverno",
+        "kyverno-policies",
+        "crossplane"
+      ],
+      "groupName": "platform-core",
+      "automerge": false,
+      "labels": ["renovate", "platform-core"]
+    },
+
+    // ── Crossplane providers ───────────────────────────────────────────────────
+    // Group all provider family bumps together — they tend to release in sync.
+    {
+      "description": "Crossplane providers",
+      "matchManagers": ["argocd"],
+      "matchPackageNames": [
+        "provider-family-aws",
+        "provider-family-gcp",
+        "provider-family-azure",
+        "provider-terraform"
+      ],
+      "groupName": "crossplane-providers",
+      "automerge": false,
+      "labels": ["renovate", "crossplane"]
+    },
+
+    // ── Service workloads: automerge patch updates ─────────────────────────────
+    // Low-risk patch bumps for deployed services can merge automatically
+    // once security.yml passes.
+    {
+      "description": "Service workloads — automerge patch only",
+      "matchManagers": ["argocd", "helm-values", "docker"],
+      "matchPackageNames": ["searxng", "searxng/searxng"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "labels": ["renovate", "service"]
+    },
+
+    // ── GitHub Actions: pin digests, group minor/patch ────────────────────────
+    // Pinning to SHA guards against tag force-push supply chain attacks.
+    // Renovate keeps the SHAs up-to-date automatically.
+    {
+      "description": "GitHub Actions — pin and group",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "pinDigests": true,
+      "automerge": false,
+      "labels": ["renovate", "ci-tooling"]
+    },
+
+    // ── CI tool downloads (kubeconform, Kyverno CLI) ───────────────────────────
+    // Patch and minor bumps automerge — these are just tooling, not deployments.
+    {
+      "description": "CI tool binaries — automerge patch and minor",
+      "matchManagers": ["regex"],
+      "matchPackageNames": ["yannh/kubeconform", "kyverno/kyverno"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "labels": ["renovate", "ci-tooling"]
+    }
+
+  ],
+
+  // ── Teach Renovate to parse curl download URLs in workflow files ──────────────
+  // Renovate doesn't natively understand curl-based tool installs.
+  // These regex managers extract the version and match against GitHub Releases.
+  "regexManagers": [
+    {
+      "fileMatch": ["\\.github/workflows/.+\\.yml$"],
+      "matchStrings": [
+        "kubeconform/releases/download/(?<currentValue>v[\\d.]+)/kubeconform"
+      ],
+      "depNameTemplate": "yannh/kubeconform",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "fileMatch": ["\\.github/workflows/.+\\.yml$"],
+      "matchStrings": [
+        "kyverno/releases/download/(?<currentValue>v[\\d.]+)/kyverno-cli"
+      ],
+      "depNameTemplate": "kyverno/kyverno",
+      "datasourceTemplate": "github-releases"
+    }
+  ],
+
+  // ── SearXNG image tag: date-based versioning, not semver ─────────────────────
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["searxng/values\\.yaml$"],
+      "matchStrings": [
+        "tag:\\s*\"(?<currentValue>[\\d.]+(-[a-f0-9]+)?)\""
+      ],
+      "depNameTemplate": "searxng/searxng",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose"
+    }
+  ]
+}

@@ -41,6 +41,12 @@ config:
     - name: stackoverflow
       disabled: false
 
+# Override the empty valkey URL injected by the chart when valkey.enabled=false.
+# SearXNG crashes if valkey.url is present but empty/invalid.
+extraConfig:
+  valkey:
+    url: "false"
+
 # Gateway API HTTPRoute — native chart support
 route:
   enabled: true

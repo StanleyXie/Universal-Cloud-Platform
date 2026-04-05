@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/searxng/searxng-helm-chart
+    - repoURL: https://charts.searxng.org
       chart: searxng
-      targetRevision: "searxng-1.0.1"
+      targetRevision: "1.0.1"
       helm:
         valueFiles:
           - $values/searxng/values.yaml

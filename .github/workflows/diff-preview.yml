@@ -1,0 +1,186 @@
+name: ArgoCD Diff Preview
+
+# Posts a PR comment showing exactly what ArgoCD would apply to the cluster.
+# Requires a self-hosted runner on the AOS cluster LAN — cloud runners cannot
+# reach 192.168.32.x. Runner label: self-hosted, aos-cluster.
+#
+# Prerequisites:
+#   1. Self-hosted runner deployed on aos01/02/03 (see scripts/setup-gh-runner.sh)
+#   2. GitHub secret ARGOCD_AUTH_TOKEN — read-only ArgoCD API token
+#      (see scripts/setup-argocd-token.sh to create it)
+#   3. ARGOCD_SERVER secret — e.g. "192.168.32.11:30843"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "argocd/**"
+      - "cilium/**"
+      - "crossplane/**"
+      - "crossplane-providers/**"
+      - "crossplane-providerconfigs/**"
+      - "gateway-api/**"
+      - "kyverno/**"
+      - "kyverno-policies/**"
+      - "kyverno-custom-policies/**"
+      - "local-path-provisioner/**"
+      - "searxng/**"
+
+permissions:
+  contents: read
+  pull-requests: write  # to post/update PR comment
+
+jobs:
+  argocd-diff:
+    name: ArgoCD App Diff
+    runs-on: [self-hosted, aos-cluster]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Detect which app directories changed in this PR ──────────────────────
+      - name: Detect changed apps
+        id: changed
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+
+          # Map changed directories to ArgoCD app names
+          # Convention: directory name == ArgoCD app name (except argocd → argocd)
+          APPS=""
+          for DIR in apps argocd cilium crossplane crossplane-providers \
+                     crossplane-providerconfigs gateway-api kyverno \
+                     kyverno-policies kyverno-custom-policies \
+                     local-path-provisioner searxng; do
+            if git diff --quiet "$BASE" "$HEAD" -- "$DIR/"; then
+              : # no change
+            else
+              case "$DIR" in
+                apps)                     APPS="$APPS argocd cilium kyverno gateway-api kyverno-policies kyverno-custom-policies crossplane crossplane-providers crossplane-providerconfigs local-path-provisioner searxng" ;;
+                crossplane-providers)     APPS="$APPS crossplane-providers" ;;
+                crossplane-providerconfigs) APPS="$APPS crossplane-providerconfigs" ;;
+                kyverno-policies)         APPS="$APPS kyverno-policies" ;;
+                kyverno-custom-policies)  APPS="$APPS kyverno-custom-policies" ;;
+                local-path-provisioner)   APPS="$APPS local-path-provisioner" ;;
+                *)                        APPS="$APPS $DIR" ;;
+              esac
+            fi
+          done
+
+          # Deduplicate
+          APPS=$(echo $APPS | tr ' ' '\n' | sort -u | tr '\n' ' ')
+          echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+          echo "Changed apps: $APPS"
+
+      # ── Install ArgoCD CLI ───────────────────────────────────────────────────
+      - name: Install ArgoCD CLI
+        run: |
+          if ! command -v argocd &>/dev/null; then
+            curl -sSL -o /usr/local/bin/argocd \
+              https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+            chmod +x /usr/local/bin/argocd
+          fi
+
+      # ── Run argocd app diff for each changed app ─────────────────────────────
+      - name: Run ArgoCD app diff
+        id: diff
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+          ARGOCD_OPTS: "--insecure"
+        run: |
+          APPS="${{ steps.changed.outputs.apps }}"
+          if [ -z "$APPS" ]; then
+            echo "result=No ArgoCD apps affected by this PR." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          OUTPUT=""
+          for APP in $APPS; do
+            echo "── Diffing $APP ──"
+
+            # Map app name to local path
+            case "$APP" in
+              crossplane-providers)      LOCAL_PATH="crossplane-providers" ;;
+              crossplane-providerconfigs) LOCAL_PATH="crossplane-providerconfigs" ;;
+              kyverno-policies)          LOCAL_PATH="kyverno-policies" ;;
+              kyverno-custom-policies)   LOCAL_PATH="kyverno-custom-policies" ;;
+              local-path-provisioner)    LOCAL_PATH="local-path-provisioner" ;;
+              gateway-api)               LOCAL_PATH="gateway-api" ;;
+              *)                         LOCAL_PATH="$APP" ;;
+            esac
+
+            DIFF=$(argocd app diff "$APP" \
+              --local "$LOCAL_PATH" \
+              --local-repo-root . \
+              --server "$ARGOCD_SERVER" \
+              2>&1) || true
+
+            if [ -z "$DIFF" ]; then
+              DIFF="(no diff — already in sync)"
+            fi
+
+            OUTPUT="${OUTPUT}
+          ### \`${APP}\`
+          \`\`\`diff
+          ${DIFF}
+          \`\`\`
+          "
+          done
+
+          # Write to file to avoid GitHub output size limits
+          echo "$OUTPUT" > /tmp/diff-output.md
+          echo "has_output=true" >> "$GITHUB_OUTPUT"
+
+      # ── Post or update PR comment ────────────────────────────────────────────
+      - name: Post diff as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- argocd-diff-preview -->';
+
+            let body;
+            if ('${{ steps.diff.outputs.has_output }}' === 'true') {
+              const diff = fs.readFileSync('/tmp/diff-output.md', 'utf8');
+              body = `${marker}
+            ## ArgoCD Diff Preview
+
+            Changes this PR would apply to the cluster:
+
+            ${diff}
+
+            <sub>Generated by [diff-preview.yml](.github/workflows/diff-preview.yml) · commit \`${{ github.event.pull_request.head.sha }}\`</sub>`;
+            } else {
+              body = `${marker}
+            ## ArgoCD Diff Preview
+
+            No ArgoCD apps affected by the changed files in this PR.`;
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            // Update existing comment if present, otherwise create new
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

@@ -1,0 +1,28 @@
+# Supplemental RBAC for Cilium operator L2 announcements.
+# Cilium Helm chart 1.19.2 does not include ciliuml2announcementpolicies
+# in the operator ClusterRole, so the L2 announcer never starts.
+# This ClusterRole + binding supplements the chart-managed ClusterRole.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cilium-operator-l2-announcements
+spec: {}
+rules:
+  - apiGroups: ["cilium.io"]
+    resources:
+      - ciliuml2announcementpolicies
+      - ciliuml2announcementpolicies/status
+    verbs: ["create", "update", "get", "list", "watch", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cilium-operator-l2-announcements
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cilium-operator-l2-announcements
+subjects:
+  - kind: ServiceAccount
+    name: cilium-operator
+    namespace: kube-system

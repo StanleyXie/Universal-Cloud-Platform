@@ -1,6 +1,6 @@
 # Universal Cloud Platform — Build Progress & Reference
 
-**Last updated:** 2026-04-05
+**Last updated:** 2026-04-05 (CI workflow fixes)
 **Status:** All components running and Synced
 **Cluster:** AOS01/AOS02/AOS03 at 192.168.32.11–13 (3-node HA K8s, v1.35.3)
 **Platform repo:** `~/platform` → `https://github.com/StanleyXie/Universal-Cloud-Platform`
@@ -23,6 +23,7 @@ GitHub (StanleyXie/Universal-Cloud-Platform)  ← single source of truth
       ├── wave 2: crossplane-providerconfigs
       ├── wave 3: local-path-provisioner  (default StorageClass)
       └── wave 3: searxng                 (common-svc, agentic search service)
+CI:   .github/workflows/security.yml     (Gitleaks · yamllint · kubeconform · Kyverno apply · ShellCheck)
 ```
 
 **Note:** Gitea was evaluated and removed — GitHub is the single source of truth.
@@ -105,14 +106,23 @@ SSH: `ssh -i ~/.ssh/id_rsa stanley@192.168.32.11`
 │   ├── provider-gcp.yaml
 │   ├── provider-azure.yaml
 │   ├── provider-cloudflare.yaml       # Disabled — see cloudflare-provider-cel-fix.md
-│   └── provider-terraform.yaml
+│   ├── provider-terraform.yaml        # Uses DeploymentRuntimeConfig (ControllerConfig deprecated)
+│   └── runtime-config-default.yaml   # Default DeploymentRuntimeConfig for all providers
 ├── crossplane-providerconfigs/
 ├── searxng/
 │   ├── values.yaml                    # Chart: unknowniq/searxng 0.1.10
 │   └── (httproute managed by chart)
-└── scripts/
-    ├── setup-credentials.sh
-    └── setup-searxng-secret.sh        # Creates searxng-secret in common-svc (not in git)
+├── scripts/
+│   ├── setup-credentials.sh
+│   └── setup-searxng-secret.sh        # Creates searxng-secret in common-svc (not in git)
+├── bootstrap/
+│   ├── bootstrap-argocd.sh            # Day-0: Helm install ArgoCD + apply root app
+│   └── k8s/                           # Node setup scripts (kubeadm init/join)
+├── test/
+│   └── sample-pod.yaml                # Minimal Pod used by Kyverno CI policy checks
+└── docs/
+    ├── plans/                         # Architecture & progress docs
+    └── issues/                        # Resolved issue write-ups
 ```
 
 ---
@@ -194,6 +204,23 @@ sources:
     ref: values
 ```
 
+### Crossplane provider-terraform — ControllerConfig deprecated
+
+`ControllerConfig` (`pkg.crossplane.io/v1alpha1`) is deprecated in Crossplane v1.16+. The `provider-terraform.yaml` now uses a dedicated `DeploymentRuntimeConfig` named `terraform` that passes `--enable-management-policies` as a container arg. The old `ControllerConfig` + `controllerConfigRef` pattern is removed.
+
+### GitHub Actions CI — all jobs green
+
+`.github/workflows/security.yml` runs 6 parallel jobs on push/PR to `main`. Known issues resolved:
+
+| Issue | Fix |
+|-------|-----|
+| kubeconform exit 123 on `/releases/latest` redirect | Pinned to `v0.7.0` with explicit versioned URL |
+| kubeconform failing on Helm `values.yaml` (missing `kind`) | Excluded `values.yaml` from `find` |
+| ClusterRole `cilium-l2-rbac.yaml` rejected (`spec` not allowed) | Removed invalid `spec: {}` field |
+| Kyverno CLI tar conflict with checked-out `kyverno/` dir | Extract to `/tmp/kyverno-cli/` |
+| `kyverno lint` / `kyverno policy lint` removed in v1.17 | Use `kyverno apply --resource test/sample-pod.yaml` |
+| yamllint `document-start` flagging K8s manifests | Disabled `document-start` rule |
+
 ### Crossplane Cloudflare provider — disabled
 
 `wildbitca/provider-upjet-cloudflare` has multiple CRD generation defects beyond the original CEL bug: missing `Snippet` CRD, kind/plural naming mismatches. Not fixable by manual patching without full Upjet code regeneration. Disabled pending `crossplane-contrib/provider-upjet-cloudflare` official release. See `2026-04-03-cloudflare-provider-cel-fix.md` for full analysis.
@@ -271,6 +298,11 @@ kubectl -n argocd annotate app <app-name> argocd.argoproj.io/refresh=hard --over
 - [x] Fixed Cilium 1.19.2 L2 RBAC gap (cilium-l2-rbac.yaml)
 - [x] SearXNG deployed in common-svc via Gateway API HTTPRoute
 - [x] http://search.aos.local accessible on port 80
+- [x] Project consolidated under universal-cloud-platform/ (docs, bootstrap, platform)
+- [x] Architecture overview doc with Mermaid diagrams (docs/plans/2026-04-05-architecture-overview.md)
+- [x] GitHub Actions security workflow — all 6 jobs passing (Gitleaks, yamllint, kubeconform, Kyverno apply, ShellCheck, ArgoCD lint)
+- [x] Migrated provider-terraform from deprecated ControllerConfig to DeploymentRuntimeConfig
+- [x] Fixed ClusterRole cilium-l2-rbac.yaml (removed invalid spec: {} field)
 
 ## Remaining / Follow-up
 

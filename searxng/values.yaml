@@ -45,7 +45,7 @@ config:
 # SearXNG crashes if valkey.url is present but empty/invalid.
 extraConfig:
   valkey:
-    url: "false"
+    url: ""
 
 # Gateway API HTTPRoute — native chart support
 route:

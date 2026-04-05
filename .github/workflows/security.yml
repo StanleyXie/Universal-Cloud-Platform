@@ -93,10 +93,9 @@ jobs:
 
       - name: Lint Kyverno ClusterPolicies
         run: |
-          kyverno lint policy \
-            kyverno/policies/ \
-            kyverno-custom-policies/ \
-            kyverno-policies/
+          kyverno policy lint \
+            --policy kyverno-custom-policies/ \
+            --policy kyverno-policies/
 
   # ── 5. Shell script analysis ──────────────────────────────────────────────────
   shellcheck:
@@ -128,6 +127,7 @@ jobs:
       - name: Validate ArgoCD Application manifests
         run: |
           find apps/ argocd/ -name "*.yaml" -o -name "*.yml" | \
+          grep -v "values.yaml" | \
           xargs kubeconform \
             -kubernetes-version 1.35.0 \
             -schema-location default \

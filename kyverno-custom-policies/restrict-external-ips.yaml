@@ -19,6 +19,13 @@ spec:
           - resources:
               kinds:
                 - Service
+      exclude:
+        any:
+          - resources:
+              kinds:
+                - Service
+              namespaces:
+                - networking
       validate:
         message: "Service externalIPs are not allowed (CVE-2020-8554)."
         pattern:

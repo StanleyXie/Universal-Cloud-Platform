@@ -1,3 +1,5 @@
 # Credential files — never commit these
 scripts/gcp-sa-key.json
 scripts/setup-credentials.sh
+bootstrap/k8s/join-command.txt
+bootstrap/k8s/*.txt

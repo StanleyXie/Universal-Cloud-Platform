@@ -67,6 +67,7 @@ jobs:
           find . -name "*.yaml" -o -name "*.yml" | \
           grep -v ".github/" | \
           grep -v "kustomization.yaml" | \
+          grep -v "values.yaml" | \
           xargs kubeconform \
             -kubernetes-version 1.35.0 \
             -schema-location default \
@@ -86,8 +87,9 @@ jobs:
         run: |
           curl -sSLo kyverno.tar.gz \
             https://github.com/kyverno/kyverno/releases/download/v1.17.1/kyverno-cli_v1.17.1_linux_x86_64.tar.gz
-          tar -xzf kyverno.tar.gz
-          sudo mv kyverno /usr/local/bin/
+          mkdir -p /tmp/kyverno-cli
+          tar -xzf kyverno.tar.gz -C /tmp/kyverno-cli
+          sudo mv /tmp/kyverno-cli/kyverno /usr/local/bin/
 
       - name: Lint Kyverno ClusterPolicies
         run: |

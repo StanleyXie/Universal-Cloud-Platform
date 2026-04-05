@@ -92,10 +92,12 @@ jobs:
           sudo mv /tmp/kyverno-cli/kyverno /usr/local/bin/
 
       - name: Lint Kyverno ClusterPolicies
+        # kyverno CLI v1.17+ has no standalone lint command — apply against a
+        # sample resource validates policy syntax and rule logic without a cluster.
         run: |
-          kyverno policy lint \
-            --policy kyverno-custom-policies/ \
-            --policy kyverno-policies/
+          kyverno apply kyverno-custom-policies/ kyverno-policies/ \
+            --resource test/sample-pod.yaml \
+            --audit-warn
 
   # ── 5. Shell script analysis ──────────────────────────────────────────────────
   shellcheck:

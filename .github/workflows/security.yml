@@ -42,6 +42,7 @@ jobs:
             rules: {
               line-length: {max: 120, level: warning},
               comments: disable,
+              document-start: disable,
               truthy: {allowed-values: ["true", "false", "yes", "no"], check-keys: false}
             }
           }' \
@@ -57,7 +58,7 @@ jobs:
       - name: Install kubeconform
         run: |
           curl -sSLo kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+            https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
           tar -xzf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
 
@@ -84,7 +85,7 @@ jobs:
       - name: Install Kyverno CLI
         run: |
           curl -sSLo kyverno.tar.gz \
-            https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli_latest_linux_x86_64.tar.gz
+            https://github.com/kyverno/kyverno/releases/download/v1.17.1/kyverno-cli_v1.17.1_linux_x86_64.tar.gz
           tar -xzf kyverno.tar.gz
           sudo mv kyverno /usr/local/bin/
 
@@ -118,7 +119,7 @@ jobs:
       - name: Install kubeconform
         run: |
           curl -sSLo kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+            https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
           tar -xzf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
 

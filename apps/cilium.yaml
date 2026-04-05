@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: "1.19.2"
+      helm:
+        valueFiles:
+          - $values/cilium/values.yaml
+    - repoURL: https://github.com/StanleyXie/Universal-Cloud-Platform
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: apps
+      kind: DaemonSet
+      managedFieldsManagers:
+        - cilium
+    - group: apps
+      kind: Deployment
+      managedFieldsManagers:
+        - cilium

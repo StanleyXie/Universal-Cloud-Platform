@@ -1,0 +1,12 @@
+# Cilium CNI — homelab AOS cluster
+# Managed by ArgoCD (adopted from direct Helm install)
+ipam:
+  mode: kubernetes
+k8sServiceHost: 192.168.32.10
+k8sServicePort: 6443
+kubeProxyReplacement: true
+
+# Gateway API support — Cilium acts as the Gateway controller
+# Requires Gateway API CRDs to be installed first (wave 1, gateway-api app)
+gatewayAPI:
+  enabled: true

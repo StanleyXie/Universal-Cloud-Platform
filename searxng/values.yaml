@@ -1,0 +1,76 @@
+image:
+  repository: searxng/searxng
+  tag: "2026.4.3-53141be38"
+  pullPolicy: IfNotPresent
+
+env:
+  INSTANCE_NAME: "AOS Search"
+  BASE_URL: "http://search.aos.local/"
+  AUTOCOMPLETE: "false"
+
+controller:
+  strategy: RollingUpdate
+
+service:
+  main:
+    ports:
+      http:
+        port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  config:
+    enabled: false
+
+ingress:
+  main:
+    enabled: false
+
+searxng:
+  config:
+    use_default_settings: true
+    server:
+      secret_key: "${SEARXNG_SECRET_KEY}"
+      limiter: false
+    search:
+      safe_search: 0
+      autocomplete: ""
+    ui:
+      default_theme: simple
+      default_language: "en"
+
+probes:
+  readiness:
+    custom: true
+    spec:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 10
+  liveness:
+    custom: true
+    spec:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 30
+  startup:
+    custom: true
+    spec:
+      httpGet:
+        path: /healthz
+        port: 8080
+      failureThreshold: 30
+      periodSeconds: 5
+
+redis:
+  enabled: false

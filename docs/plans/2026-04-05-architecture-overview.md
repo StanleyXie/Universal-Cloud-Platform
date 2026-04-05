@@ -6,290 +6,387 @@
 
 ---
 
-## 1. High-Level Architecture
+## 1. Platform Overview
 
 ```mermaid
-graph TB
-    subgraph Developer["Developer Workstation"]
-        git["git push"]
+flowchart TB
+    classDef src     fill:#dbeafe,stroke:#2563eb,color:#1e3a5f,font-weight:bold
+    classDef ci      fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef argo    fill:#d1fae5,stroke:#059669,color:#064e3b,font-weight:bold
+    classDef net     fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef pol     fill:#fdf4ff,stroke:#a21caf,color:#4a044e
+    classDef cld     fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef stor    fill:#f1f5f9,stroke:#475569,color:#0f172a
+    classDef svc     fill:#fff1f2,stroke:#e11d48,color:#881337
+    classDef disabled fill:#f8fafc,stroke:#94a3b8,color:#94a3b8,stroke-dasharray:5 5
+
+    DEV(["👤 Developer"]):::src
+
+    subgraph GITHUB["GitHub — Source of Truth"]
+        REPO[("Universal-Cloud-Platform\nStanleyXie/...")]:::src
+        CIBOX["GitHub Actions CI\nGitleaks · yamllint\nkubeconform · Kyverno CLI · ShellCheck"]:::ci
     end
 
-    subgraph GitHub["GitHub — Source of Truth"]
-        repo["StanleyXie/Universal-Cloud-Platform\n(manifests + Helm values)"]
-        actions["GitHub Actions\n· Gitleaks · yamllint\n· kubeconform · Kyverno CLI\n· ShellCheck"]
-    end
+    subgraph CLUSTER["AOS Homelab Cluster   ·   Kubernetes v1.35.3   ·   VIP 192.168.32.10"]
 
-    subgraph Cluster["AOS Homelab Cluster · 192.168.32.10 (VIP)"]
-        direction TB
+        ARGOCD["ArgoCD 9.4.17\nApp-of-Apps · waves 0 → 3"]:::argo
 
-        subgraph ControlPlane["Control Plane Layer"]
-            argocd["ArgoCD 9.4.17\napp-of-apps (root)"]
-            kyverno["Kyverno 3.7.1\n3 admission replicas"]
+        subgraph NET_BOX["Networking"]
+            CIL["Cilium v1.19.2\nCNI · eBPF · kube-proxy replacement\nGateway API controller · L2 ARP"]:::net
+            GW[/"platform-gateway\n192.168.32.100 : 80"/]:::net
         end
 
-        subgraph Networking["Networking Layer"]
-            cilium["Cilium v1.19.2\nCNI · kube-proxy replacement\nGateway API controller · L2 ARP"]
-            gw["platform-gateway\n192.168.32.100:80\n(GatewayClass: cilium)"]
-            pool["CiliumLoadBalancerIPPool\n192.168.32.100 – 110"]
+        subgraph POL_BOX["Policy"]
+            KYV["Kyverno 3.7.1\n15 ClusterPolicies · 3 replicas\nBaseline PSS + Custom Rules"]:::pol
         end
 
-        subgraph Storage["Storage"]
-            lpp["local-path-provisioner\ndefault StorageClass"]
+        subgraph CLD_BOX["Cloud Management"]
+            XP["Crossplane"]:::cld
+            PROV["AWS   ·   GCP   ·   Azure   ·   Terraform"]:::cld
+            CF(["Cloudflare  ⚠ disabled"]):::disabled
         end
 
-        subgraph CloudMgmt["Cloud Management (Crossplane)"]
-            xp["Crossplane (latest 1.x)"]
-            aws["provider-family-aws"]
-            gcp["provider-family-gcp"]
-            azure["provider-family-azure"]
-            tf["provider-terraform"]
-            cf["provider-cloudflare\n⚠ disabled"]
+        subgraph STOR_BOX["Storage"]
+            LPP[("local-path-provisioner\ndefault StorageClass")]:::stor
         end
 
-        subgraph Services["Services (common-svc)"]
-            searxng["SearXNG\nsearch.aos.local"]
+        subgraph SVC_BOX["Services"]
+            SRX["SearXNG\ncommon-svc · search.aos.local"]:::svc
         end
     end
 
-    subgraph LAN["LAN Clients"]
-        browser["Browser / curl\nhttp://search.aos.local"]
-    end
+    DEV          -- "git push"                    --> REPO
+    REPO         -- "on push / PR"                --> CIBOX
+    REPO         -- "GitOps pull  (3 min)"        --> ARGOCD
 
-    git -->|push| repo
-    repo -->|CI on push/PR| actions
-    repo -->|GitOps pull| argocd
-    argocd -->|deploys & reconciles| ControlPlane
-    argocd -->|deploys & reconciles| Networking
-    argocd -->|deploys & reconciles| Storage
-    argocd -->|deploys & reconciles| CloudMgmt
-    argocd -->|deploys & reconciles| Services
-    kyverno -->|admits / denies Pods| Services
-    kyverno -->|admits / denies Pods| CloudMgmt
-    cilium --> gw
-    pool --> gw
-    gw -->|HTTPRoute| searxng
-    browser -->|ARP → 192.168.32.100| gw
+    ARGOCD       -- "wave 0"                      --> CIL
+    ARGOCD       -- "wave 0"                      --> LPP
+    ARGOCD       -- "wave 1"                      --> GW
+    ARGOCD       -- "wave 1"                      --> KYV
+    ARGOCD       -- "wave 2"                      --> XP
+    ARGOCD       -- "wave 3"                      --> SRX
+
+    CIL          -->                                 GW
+    XP           -->                                 PROV
+    XP           -. "pending release" .->            CF
+    GW           -- "HTTPRoute"                   --> SRX
+    KYV          -. "admission control"  .->         SRX
+    KYV          -. "admission control"  .->         PROV
 ```
 
 ---
 
-## 2. Cluster Infrastructure
+## 2. Cluster Nodes
 
-| Node | Role | IP | OS |
-|------|------|----|----|
-| aos01 | control-plane | 192.168.32.11 | Ubuntu (NUC) |
-| aos02 | control-plane | 192.168.32.12 | Ubuntu (NUC) |
-| aos03 | control-plane + worker | 192.168.32.13 | Ubuntu (NUC) |
-| — | kube-vip VIP | 192.168.32.10 | — |
+| Node | Role | IP |
+|------|------|----|
+| aos01 | control-plane | 192.168.32.11 |
+| aos02 | control-plane | 192.168.32.12 |
+| aos03 | control-plane + worker | 192.168.32.13 |
+| — | kube-vip VIP | 192.168.32.10 |
 
-- **CNI:** Cilium v1.19.2 — kube-proxy replacement, eBPF dataplane
-- **HA:** kubeadm stacked etcd, kube-vip L2 control-plane VIP
-- **Storage:** local-path-provisioner (default StorageClass, `local-path`)
-
----
-
-## 3. GitOps — ArgoCD App-of-Apps
-
-```mermaid
-flowchart TD
-    root["root App\n(watches apps/)"]
-
-    root --> w0a["wave 0\nargocd\n(self-managed)"]
-    root --> w0b["wave 0\ncilium"]
-    root --> w0c["wave 0\nlocal-path-provisioner"]
-
-    root --> w1a["wave 1\nkyverno"]
-    root --> w1b["wave 1\ngateway-api"]
-    root --> w1c["wave 1\nkyverno-policies\n(baseline)"]
-    root --> w1d["wave 1\nkyverno-custom-policies"]
-
-    root --> w2a["wave 2\ncrossplane"]
-    root --> w2b["wave 2\ncrossplane-providers"]
-    root --> w2c["wave 2\ncrossplane-providerconfigs"]
-
-    root --> w3a["wave 3\nsearxng"]
-
-    style w0a fill:#d4edda,stroke:#28a745
-    style w0b fill:#d4edda,stroke:#28a745
-    style w0c fill:#d4edda,stroke:#28a745
-    style w1a fill:#cce5ff,stroke:#004085
-    style w1b fill:#cce5ff,stroke:#004085
-    style w1c fill:#cce5ff,stroke:#004085
-    style w1d fill:#cce5ff,stroke:#004085
-    style w2a fill:#fff3cd,stroke:#856404
-    style w2b fill:#fff3cd,stroke:#856404
-    style w2c fill:#fff3cd,stroke:#856404
-    style w3a fill:#f8d7da,stroke:#721c24
-```
-
-All apps use `automated: {prune: true, selfHeal: true}` (except `argocd` which uses `prune: false`).  
-Helm values are sourced from the same repo via the multi-source `ref:` pattern.
+- **CNI:** Cilium v1.19.2 · eBPF dataplane · kube-proxy replacement
+- **HA:** kubeadm stacked etcd · kube-vip L2 control-plane VIP
+- **Storage:** local-path-provisioner · `local-path` default StorageClass
 
 ---
 
-## 4. Networking — Gateway API & L2
+## 3. GitOps — Sync Wave Deployment Order
 
 ```mermaid
 flowchart LR
-    client["LAN Client\nbrowser"] -->|"HTTP GET search.aos.local"| arp
+    classDef root fill:#f8fafc,stroke:#475569,color:#0f172a,font-weight:bold
+    classDef w0   fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef w1   fill:#dbeafe,stroke:#2563eb,color:#1e3a5f
+    classDef w2   fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef w3   fill:#fce7f3,stroke:#db2777,color:#831843
 
-    subgraph L2["Layer 2 — ARP"]
-        arp["ARP broadcast\nsearch.aos.local → 192.168.32.100"]
+    ROOT(["root App\ngithub: apps/"]):::root
+
+    subgraph W0["Wave 0 — Infrastructure Bootstrap"]
+        direction TB
+        A0["ArgoCD 9.4.17\nself-managed"]:::w0
+        B0["Cilium v1.19.2\nCNI · L2 · Gateway API"]:::w0
+        C0["local-path-provisioner\ndefault StorageClass"]:::w0
     end
 
-    arp --> gw
-
-    subgraph networking["Namespace: networking"]
-        gw["platform-gateway\nIP: 192.168.32.100:80\nGatewayClass: cilium"]
+    subgraph W1["Wave 1 — Policy & Networking"]
+        direction TB
+        A1["Kyverno 3.7.1\nController"]:::w1
+        B1["gateway-api\nCRDs + platform-gateway"]:::w1
+        C1["kyverno-policies\nBaseline PSS"]:::w1
+        D1["kyverno-custom-policies\nCustom rules + exceptions"]:::w1
     end
 
-    gw -->|"HTTPRoute\nhostname: search.aos.local\npath: /"| svc
-
-    subgraph common-svc["Namespace: common-svc"]
-        svc["searxng Service\nClusterIP:8080"]
-        pod["SearXNG Pod"]
-        svc --> pod
+    subgraph W2["Wave 2 — Cloud Management"]
+        direction TB
+        A2["Crossplane"]:::w2
+        B2["crossplane-providers\nAWS · GCP · Azure · Terraform"]:::w2
+        C2["crossplane-providerconfigs\nCredential bindings"]:::w2
     end
+
+    subgraph W3["Wave 3 — Services"]
+        A3["SearXNG\nsearch.aos.local"]:::w3
+    end
+
+    ROOT --> W0 --> W1 --> W2 --> W3
 ```
 
-**Key components:**
+All apps: `automated: {prune: true, selfHeal: true}` — except `argocd` which uses `prune: false`.  
+Helm values sourced from the same repo via multi-source `ref:` pattern.
 
-| Resource | Kind | Details |
-|----------|------|---------|
-| `platform-gateway` | `Gateway` | Namespace `networking`, GatewayClass `cilium`, port 80 HTTP, `allowedRoutes.namespaces: All` |
-| `platform-lb-pool` | `CiliumLoadBalancerIPPool` | 192.168.32.100 – 192.168.32.110 |
-| `platform-l2-policy` | `CiliumL2AnnouncementPolicy` | Interfaces `^enp.*`, LoadBalancer IPs only |
+---
+
+## 4. Networking — Traffic Flow
+
+```mermaid
+flowchart LR
+    classDef client fill:#f0f9ff,stroke:#0284c7,color:#0c4a6e,font-weight:bold
+    classDef l2     fill:#ecfdf5,stroke:#059669,color:#064e3b
+    classDef gw     fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef svc    fill:#fdf4ff,stroke:#9333ea,color:#3b0764
+    classDef pod    fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+
+    CLIENT(["🖥️ LAN Client"]):::client
+
+    subgraph L2LAYER["Cilium L2 Announcement  (ARP)"]
+        ARP["192.168.32.100\n← announced via ARP on enp*"]:::l2
+    end
+
+    subgraph NS_NET["namespace: networking"]
+        GW[/"platform-gateway\n192.168.32.100 : 80\nGatewayClass: cilium"/]:::gw
+    end
+
+    subgraph NS_SVC["namespace: common-svc"]
+        SVC(["searxng Service\nClusterIP : 8080"]):::svc
+        POD["SearXNG Pod\nimage: 2026.4.3"]:::pod
+        SVC --> POD
+    end
+
+    CLIENT  -- "GET http://search.aos.local"          --> ARP
+    ARP     -->                                           GW
+    GW      -- "HTTPRoute\nhost: search.aos.local / *" --> SVC
+```
+
+**L2 components:**
+
+| Resource | Kind | Value |
+|----------|------|-------|
+| `platform-lb-pool` | `CiliumLoadBalancerIPPool` | 192.168.32.100 – .110 |
+| `platform-l2-policy` | `CiliumL2AnnouncementPolicy` | interfaces `^enp.*` · LoadBalancer IPs |
 | `cilium-operator-l2-announcements` | `ClusterRole` + `ClusterRoleBinding` | Supplemental RBAC — Cilium 1.19.2 chart omits `ciliuml2announcementpolicies` from operator ClusterRole |
 
-**Known fix applied:** Cilium 1.19.2 Helm chart does not grant the operator RBAC for `ciliuml2announcementpolicies`. Without it the L2 announcer silently does nothing. Fixed via `gateway-api/cilium-l2-rbac.yaml`.
-
 ---
 
-## 5. Policy — Kyverno
-
-```mermaid
-flowchart TD
-    req["Admission Request\n(Pod create/update)"]
-    req --> kyverno["Kyverno Admission Controller\n3 replicas"]
-
-    kyverno --> baseline["kyverno-policies\nPod Security Baseline\n· disallow-host-namespaces\n· disallow-host-path\n· disallow-privileged-containers\n· disallow-capabilities\n· disallow-host-ports\n· restrict-seccomp\n(all: Audit mode)"]
-
-    kyverno --> custom["kyverno-custom-policies\n· disallow-default-namespace\n· require-resource-limits\n· restrict-external-ips\n· require-crossplane-labels"]
-
-    kyverno --> exc["PolicyExceptions\n· kube-system-exception\n  (kube-system, local-path-storage,\n   argocd, crossplane-system, monitoring)\n· gateway-external-ip-exception\n  (networking namespace)"]
-
-    baseline -->|"violates → Audit"| report["PolicyReport\ncluster-wide"]
-    custom -->|"violates → Audit"| report
-    exc -->|"exempt"| allow["Allowed"]
-```
-
-**ClusterPolicies (custom):**
-
-| Policy | Mode | Purpose |
-|--------|------|---------|
-| `disallow-default-namespace` | Enforce | Blocks workloads in `default` namespace |
-| `require-resource-limits` | Audit | All containers must declare CPU + memory limits |
-| `restrict-external-ips` | Enforce | Services may not specify `.spec.externalIPs` (CVE-2020-8554 mitigation) |
-| `require-crossplane-labels` | Audit | Crossplane managed resources must carry `crossplane.io/claim-name` label |
-
----
-
-## 6. Cloud Management — Crossplane
+## 5. Policy — Kyverno Admission Flow
 
 ```mermaid
 flowchart LR
-    xp["Crossplane\ncrossplane-system"]
+    classDef req      fill:#f0f9ff,stroke:#0284c7,color:#0c4a6e,font-weight:bold
+    classDef engine   fill:#fdf4ff,stroke:#a21caf,color:#4a044e,font-weight:bold
+    classDef baseline fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef custom   fill:#dbeafe,stroke:#2563eb,color:#1e3a5f
+    classDef exc      fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef allow    fill:#dcfce7,stroke:#16a34a,color:#14532d,font-weight:bold
+    classDef deny     fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,font-weight:bold
+    classDef report   fill:#f1f5f9,stroke:#475569,color:#0f172a
 
-    xp --> aws["provider-family-aws\nSecret: aws-creds"]
-    xp --> gcp["provider-family-gcp\nSecret: gcp-creds"]
-    xp --> azure["provider-family-azure\nSecret: azure-creds"]
-    xp --> tf["provider-terraform\nSecret: tf-creds"]
-    xp -. "disabled" .-> cf["provider-cloudflare\n⚠ No production xpkg exists\nMonitor: crossplane-contrib releases"]
+    REQ(["Admission Request\nPod · Deployment · Service"]):::req
 
-    aws --> awspc["ProviderConfig: default\ncredentials source: Secret"]
-    gcp --> gcppc["ProviderConfig: default\ncredentials source: Secret"]
-    azure --> azurepc["ProviderConfig: default\ncredentials source: Secret"]
+    KYV(["Kyverno\nAdmission Controller\n3 replicas"]):::engine
+
+    subgraph BASELINE["Baseline Pod Security  (Audit)"]
+        direction TB
+        B1["disallow-host-namespaces"]:::baseline
+        B2["disallow-host-path"]:::baseline
+        B3["disallow-privileged-containers"]:::baseline
+        B4["disallow-capabilities"]:::baseline
+        B5["restrict-seccomp"]:::baseline
+    end
+
+    subgraph CUSTOM["Custom Policies"]
+        direction TB
+        C1["disallow-default-namespace  Enforce"]:::custom
+        C2["require-resource-limits  Audit"]:::custom
+        C3["restrict-external-ips  Enforce"]:::custom
+        C4["require-crossplane-labels  Audit"]:::custom
+    end
+
+    subgraph EXCEPT["PolicyExceptions  (always Allowed)"]
+        direction TB
+        E1["kube-system-exception\nkube-system · argocd · crossplane-system\nmonitoring · local-path-storage"]:::exc
+        E2["gateway-external-ip-exception\nnetworking namespace"]:::exc
+    end
+
+    ALLOW(["✅ Allowed"]):::allow
+    DENY(["❌ Denied"]):::deny
+    RPT(["📋 PolicyReport\nAudit log"]):::report
+
+    REQ        --> KYV
+    KYV        --> BASELINE
+    KYV        --> CUSTOM
+    KYV        --> EXCEPT
+    BASELINE   -- "Audit violation"  --> RPT
+    CUSTOM     -- "Enforce violation"--> DENY
+    CUSTOM     -- "Audit violation"  --> RPT
+    EXCEPT     -->                      ALLOW
 ```
-
-All providers use `DeploymentRuntimeConfig: default` for resource limits.  
-Credentials are stored as Kubernetes Secrets (created by `platform/scripts/setup-credentials.sh` — **not yet configured**).
-
-**provider-cloudflare status:** Disabled. The `wildbitca/provider-upjet-cloudflare` fork has unfixable CRD generation defects. The official `crossplane-contrib/provider-upjet-cloudflare` has no published xpkg release yet. Monitor [releases](https://github.com/crossplane-contrib/provider-upjet-cloudflare/releases).
 
 ---
 
-## 7. Services
+## 6. Cloud Management — Crossplane Providers
 
-| Service | Namespace | Helm Chart | Exposed At |
-|---------|-----------|------------|------------|
+```mermaid
+flowchart TB
+    classDef ctrl     fill:#ede9fe,stroke:#7c3aed,color:#2e1065,font-weight:bold
+    classDef active   fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef config   fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    classDef disabled fill:#f8fafc,stroke:#94a3b8,color:#94a3b8,stroke-dasharray:5 5
+    classDef cred     fill:#fef9c3,stroke:#ca8a04,color:#713f12
+
+    XP(["Crossplane\ncrossplane-system · v1.x"]):::ctrl
+
+    subgraph ACTIVE["Active Providers  (Installed · Healthy)"]
+        direction LR
+        AWS["provider-family-aws"]:::active
+        GCP["provider-family-gcp"]:::active
+        AZ["provider-family-azure"]:::active
+        TF["provider-terraform"]:::active
+    end
+
+    subgraph CONFIGS["ProviderConfigs  (credential bindings)"]
+        direction LR
+        AC["ProviderConfig: default\nSecret: aws-creds"]:::config
+        GC["ProviderConfig: default\nSecret: gcp-creds"]:::config
+        AZC["ProviderConfig: default\nSecret: azure-creds"]:::config
+    end
+
+    CF(["provider-cloudflare\n⚠ no xpkg available\nmonitor crossplane-contrib/releases"]):::disabled
+
+    NOTE["⚠ Credentials not yet provisioned\nRun: scripts/setup-credentials.sh"]:::cred
+
+    XP  --> ACTIVE
+    XP  -. "pending release" .-> CF
+    AWS --> AC
+    GCP --> GC
+    AZ  --> AZC
+    AC & GC & AZC --> NOTE
+```
+
+---
+
+## 7. CI/CD — Security Workflow
+
+```mermaid
+flowchart TB
+    classDef trigger fill:#dbeafe,stroke:#2563eb,color:#1e3a5f,font-weight:bold
+    classDef job     fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    classDef pass    fill:#d1fae5,stroke:#059669,color:#064e3b,font-weight:bold
+    classDef fail    fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,font-weight:bold
+
+    TRIGGER(["push / PR → main"]):::trigger
+
+    subgraph JOBS["Parallel Jobs   (.github/workflows/security.yml)"]
+        direction LR
+        J1["secret-scan\nGitleaks\nfull git history"]:::job
+        J2["yaml-lint\nyamllint\nall *.yaml / *.yml"]:::job
+        J3["manifest-validate\nkubeconform\nk8s 1.35.0 schema"]:::job
+        J4["kyverno-lint\nKyverno CLI\npolicy syntax"]:::job
+        J5["shellcheck\nShellCheck\nscripts/"]:::job
+        J6["argocd-app-lint\nkubeconform\napps/ + argocd/"]:::job
+    end
+
+    OK(["✅ All passed — merge allowed"]):::pass
+    NOK(["❌ Failed — merge blocked"]):::fail
+
+    TRIGGER --> JOBS
+    JOBS    -- "all green" --> OK
+    JOBS    -- "any red"   --> NOK
+```
+
+---
+
+## 8. Services
+
+| Service | Namespace | Chart | Endpoint |
+|---------|-----------|-------|----------|
 | SearXNG | `common-svc` | unknowniq/searxng 0.1.10 | `http://search.aos.local` → 192.168.32.100:80 |
 
-**SearXNG notes:**
-- Secret key managed via `platform/scripts/setup-searxng-secret.sh` (random generation, stored in `searxng-secret`)
-- Valkey/Redis disabled; chart injects empty `valkey.url` causing crash — fixed with `extraConfig.valkey.url: "false"` in values
+**Notes:**
+- Secret key: `scripts/setup-searxng-secret.sh` → K8s Secret `searxng-secret`
+- Valkey/Redis disabled; chart injects empty `valkey.url` causing crash → fixed with `extraConfig.valkey.url: "false"`
 - HTTPRoute configured via chart-native `route:` block targeting `platform-gateway`
 
 ---
 
-## 8. CI/CD — GitHub Actions Security Workflow
+## 9. Repository Structure
 
-File: `.github/workflows/security.yml`
-
-```mermaid
-flowchart LR
-    push["push / PR\nto main"] --> jobs
-
-    subgraph jobs["Parallel Jobs"]
-        gl["secret-scan\nGitleaks\n(full git history)"]
-        yl["yaml-lint\nyamllint"]
-        mv["manifest-validate\nkubeconform\nK8s 1.35.0 schema"]
-        kl["kyverno-lint\nKyverno CLI\npolicy lint"]
-        sc["shellcheck\nScripts in scripts/"]
-        al["argocd-app-lint\nkubeconform\nArgoCD app manifests"]
-    end
+```
+Universal-Cloud-Platform/  (github.com/StanleyXie/Universal-Cloud-Platform)
+│
+├── .github/workflows/
+│   └── security.yml               ← CI: Gitleaks · yamllint · kubeconform · Kyverno CLI · ShellCheck
+│
+├── apps/                          ← ArgoCD App-of-Apps (root watches this dir)
+│   ├── argocd.yaml                  wave 0
+│   ├── cilium.yaml                  wave 0
+│   ├── local-path-provisioner.yaml  wave 0
+│   ├── kyverno.yaml                 wave 1
+│   ├── gateway-api.yaml             wave 1
+│   ├── kyverno-policies.yaml        wave 1
+│   ├── kyverno-custom-policies.yaml wave 1
+│   ├── crossplane.yaml              wave 2
+│   ├── crossplane-providers.yaml    wave 2
+│   ├── crossplane-providerconfigs.yaml wave 2
+│   ├── searxng.yaml                 wave 3
+│   └── root.yaml                  ← self-referencing root app
+│
+├── argocd/                        ← ArgoCD Helm values
+├── cilium/                        ← Cilium Helm values (CNI + Gateway API + L2)
+├── crossplane/                    ← Crossplane Helm values
+├── crossplane-providers/          ← Provider CRs (AWS/GCP/Azure/Terraform)
+├── crossplane-providerconfigs/    ← ProviderConfig CRs (credential bindings)
+├── gateway-api/                   ← CRD kustomization + Gateway + L2 pool + RBAC fix
+├── kyverno/                       ← Kyverno Helm values
+├── kyverno-policies/              ← Upstream Baseline PSS Helm values
+├── kyverno-custom-policies/       ← Custom ClusterPolicies + PolicyExceptions
+├── local-path-provisioner/        ← StorageClass manifest
+├── searxng/                       ← SearXNG Helm values
+│
+├── scripts/                       ← Cluster-level setup scripts
+│   ├── setup-credentials.sh         cloud provider secrets
+│   └── setup-searxng-secret.sh      SearXNG secret key generation
+│
+├── bootstrap/                     ← Day-0 scripts (run once)
+│   ├── bootstrap-argocd.sh          Helm install ArgoCD + apply root app
+│   └── k8s/                         Node setup scripts (kubeadm init/join)
+│
+└── docs/
+    ├── plans/                     ← Architecture & design docs
+    └── issues/                    ← Resolved issue write-ups
 ```
 
 ---
 
-## 9. Project Repository Structure
+## 10. Access
 
-```
-universal-cloud-platform/           ← project root (local only, not a git repo)
-├── .gitignore                      ← excludes DS_Store, join-command.txt, secrets
-├── platform/                       ← git repo → github.com/StanleyXie/Universal-Cloud-Platform
-│   ├── .github/workflows/
-│   │   └── security.yml            ← CI security scanning
-│   ├── apps/                       ← ArgoCD Application manifests (app-of-apps)
-│   ├── argocd/                     ← ArgoCD Helm values
-│   ├── cilium/                     ← Cilium Helm values
-│   ├── crossplane/                 ← Crossplane Helm values
-│   ├── crossplane-providers/       ← Provider CRs (AWS/GCP/Azure/Terraform)
-│   ├── crossplane-providerconfigs/ ← ProviderConfig CRs
-│   ├── gateway-api/                ← CRD kustomization + Gateway + L2 pool + RBAC fix
-│   ├── kyverno/                    ← Kyverno Helm values
-│   ├── kyverno-policies/           ← Upstream baseline policy Helm values
-│   ├── kyverno-custom-policies/    ← Custom ClusterPolicies + PolicyExceptions
-│   ├── local-path-provisioner/     ← StorageClass manifest
-│   ├── scripts/                    ← setup-searxng-secret.sh, setup-credentials.sh
-│   └── searxng/                    ← SearXNG Helm values
-├── docs/
-│   ├── plans/                      ← Architecture & progress docs
-│   └── issues/                     ← Resolved issue notes
-├── provider-upjet-cloudflare/      ← git repo (fork, paused)
-└── scripts/
-    ├── bootstrap-argocd.sh         ← Day-0 ArgoCD install + root app apply
-    └── k8s/                        ← Cluster setup scripts
-        └── join-command.txt        ← ⚠ gitignored — contains bootstrap token
-```
+| Service | Address | Notes |
+|---------|---------|-------|
+| ArgoCD UI | `https://192.168.32.11:30843` | admin user |
+| SearXNG | `http://search.aos.local` | add `192.168.32.100 search.aos.local` to `/etc/hosts` |
+| Platform Gateway | `192.168.32.100:80` | Cilium L2 ARP, HTTPRoute routing |
+| kubectl | `~/.kube/config` | merged from remote cluster |
+
+SSH: `ssh stanley@192.168.32.11`
 
 ---
 
-## 10. Pending / Roadmap
+## 11. Pending / Roadmap
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Observability stack | High | kube-prometheus-stack + Loki + Promtail, wave 4 |
-| Cloud credentials | Medium | Run `scripts/setup-credentials.sh` to populate provider secrets |
-| provider-cloudflare | Low | Monitor crossplane-contrib/provider-upjet-cloudflare for first release |
-| TLS on platform-gateway | Low | Add HTTPS listener + cert-manager for `*.aos.local` |
-| ArgoCD OIDC / SSO | Low | Replace admin password auth |
+| Observability | High | kube-prometheus-stack + Loki + Promtail · wave 4 |
+| Cloud credentials | Medium | Run `scripts/setup-credentials.sh` |
+| provider-cloudflare | Low | Monitor [crossplane-contrib/provider-upjet-cloudflare](https://github.com/crossplane-contrib/provider-upjet-cloudflare/releases) |
+| TLS on gateway | Low | Add HTTPS listener + cert-manager for `*.aos.local` |
+| ArgoCD SSO | Low | Replace admin password with OIDC |

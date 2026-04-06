@@ -9,10 +9,10 @@
   "packageRules": [
 
     // ── Platform core: ArgoCD, Cilium, Kyverno, Crossplane ─────────────────────
-    // These require manual review — chart upgrades can have breaking changes.
+    // Require manual review — chart upgrades can have breaking changes.
     {
       "description": "Platform core components — batch weekly, no automerge",
-      "matchManagers": ["argocd", "helm-values"],
+      "matchManagers": ["custom.regex", "helm-values"],
       "matchPackageNames": [
         "argo-cd",
         "cilium",
@@ -26,15 +26,15 @@
     },
 
     // ── Crossplane providers ───────────────────────────────────────────────────
-    // Group all provider family bumps together — they tend to release in sync.
+    // Group all provider family bumps — they tend to release in sync.
     {
-      "description": "Crossplane providers",
-      "matchManagers": ["argocd"],
+      "description": "Crossplane providers — batch, no automerge",
+      "matchManagers": ["custom.regex"],
       "matchPackageNames": [
-        "provider-family-aws",
-        "provider-family-gcp",
-        "provider-family-azure",
-        "provider-terraform"
+        "upbound/provider-family-aws",
+        "upbound/provider-family-gcp",
+        "upbound/provider-family-azure",
+        "upbound/provider-terraform"
       ],
       "groupName": "crossplane-providers",
       "automerge": false,
@@ -42,23 +42,22 @@
     },
 
     // ── Service workloads: automerge patch updates ─────────────────────────────
-    // Low-risk patch bumps for deployed services can merge automatically
-    // once security.yml passes.
+    // SearXNG uses date-based versioning (not semver), treat all updates
+    // as patch-equivalent — automerge once security.yml passes.
     {
-      "description": "Service workloads — automerge patch only",
-      "matchManagers": ["argocd", "helm-values", "docker"],
-      "matchPackageNames": ["searxng", "searxng/searxng"],
-      "matchUpdateTypes": ["patch"],
+      "description": "Service workloads — automerge",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["searxng/searxng", "unknowniq/searxng"],
       "automerge": true,
       "automergeType": "pr",
       "labels": ["renovate", "service"]
     },
 
-    // ── GitHub Actions: pin digests, group minor/patch ────────────────────────
-    // Pinning to SHA guards against tag force-push supply chain attacks.
-    // Renovate keeps the SHAs up-to-date automatically.
+    // ── GitHub Actions: pin to SHA digests ────────────────────────────────────
+    // Prevents supply chain attacks via tag force-push.
+    // Major version bumps (v4→v6) require manual review.
     {
-      "description": "GitHub Actions — pin and group",
+      "description": "GitHub Actions — pin digests, no automerge",
       "matchManagers": ["github-actions"],
       "groupName": "github-actions",
       "pinDigests": true,
@@ -66,24 +65,110 @@
       "labels": ["renovate", "ci-tooling"]
     },
 
-    // ── CI tool downloads (kubeconform, Kyverno CLI) ───────────────────────────
-    // Patch and minor bumps automerge — these are just tooling, not deployments.
+    // ── CI tool downloads: kubeconform, Kyverno CLI ───────────────────────────
+    // These are tooling-only — automerge all updates.
     {
-      "description": "CI tool binaries — automerge patch and minor",
-      "matchManagers": ["regex"],
+      "description": "CI tool binaries — automerge all",
+      "matchManagers": ["custom.regex"],
       "matchPackageNames": ["yannh/kubeconform", "kyverno/kyverno"],
-      "matchUpdateTypes": ["patch", "minor"],
       "automerge": true,
       "labels": ["renovate", "ci-tooling"]
     }
 
   ],
 
-  // ── Teach Renovate to parse curl download URLs in workflow files ──────────────
-  // Renovate doesn't natively understand curl-based tool installs.
-  // These regex managers extract the version and match against GitHub Releases.
-  "regexManagers": [
+  // ── customManagers (unified, replaces deprecated regexManagers) ───────────────
+  "customManagers": [
+
+    // ArgoCD Application: Helm chart targetRevision — platform core
     {
+      "customType": "regex",
+      "fileMatch": ["^apps/argocd\\.yaml$"],
+      "matchStrings": ["targetRevision:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "argo-cd",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://argoproj.github.io/argo-helm"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^apps/cilium\\.yaml$"],
+      "matchStrings": ["targetRevision:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "cilium",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://helm.cilium.io"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^apps/kyverno\\.yaml$"],
+      "matchStrings": ["targetRevision:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "kyverno",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://kyverno.github.io/kyverno"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^apps/kyverno-policies\\.yaml$"],
+      "matchStrings": ["targetRevision:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "kyverno-policies",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://kyverno.github.io/kyverno"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^apps/crossplane\\.yaml$"],
+      "matchStrings": ["targetRevision:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "crossplane",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://charts.crossplane.io/stable"
+    },
+
+    // ArgoCD Application: SearXNG Helm chart
+    {
+      "customType": "regex",
+      "fileMatch": ["^apps/searxng\\.yaml$"],
+      "matchStrings": ["targetRevision:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "unknowniq/searxng",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://unknowniq.github.io/helm-charts"
+    },
+
+    // Crossplane Provider packages — xpkg versions
+    {
+      "customType": "regex",
+      "fileMatch": ["^crossplane-providers/provider-aws\\.yaml$"],
+      "matchStrings": ["package:\\s*xpkg\\.upbound\\.io/upbound/provider-family-aws:(?<currentValue>v[\\d]+)"],
+      "depNameTemplate": "upbound/provider-family-aws",
+      "datasourceTemplate": "github-releases",
+      "registryUrlTemplate": "https://github.com"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^crossplane-providers/provider-gcp\\.yaml$"],
+      "matchStrings": ["package:\\s*xpkg\\.upbound\\.io/upbound/provider-family-gcp:(?<currentValue>v[\\d]+)"],
+      "depNameTemplate": "upbound/provider-family-gcp",
+      "datasourceTemplate": "github-releases",
+      "registryUrlTemplate": "https://github.com"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^crossplane-providers/provider-azure\\.yaml$"],
+      "matchStrings": ["package:\\s*xpkg\\.upbound\\.io/upbound/provider-family-azure:(?<currentValue>v[\\d]+)"],
+      "depNameTemplate": "upbound/provider-family-azure",
+      "datasourceTemplate": "github-releases",
+      "registryUrlTemplate": "https://github.com"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^crossplane-providers/provider-terraform\\.yaml$"],
+      "matchStrings": ["package:\\s*xpkg\\.upbound\\.io/upbound/provider-terraform:(?<currentValue>v[\\d]+)"],
+      "depNameTemplate": "upbound/provider-terraform",
+      "datasourceTemplate": "github-releases",
+      "registryUrlTemplate": "https://github.com"
+    },
+
+    // CI tool binaries downloaded via curl in workflow files
+    {
+      "customType": "regex",
       "fileMatch": ["\\.github/workflows/.+\\.yml$"],
       "matchStrings": [
         "kubeconform/releases/download/(?<currentValue>v[\\d.]+)/kubeconform"
@@ -92,6 +177,7 @@
       "datasourceTemplate": "github-releases"
     },
     {
+      "customType": "regex",
       "fileMatch": ["\\.github/workflows/.+\\.yml$"],
       "matchStrings": [
         "kyverno/releases/download/(?<currentValue>v[\\d.]+)/kyverno-cli"
@@ -99,19 +185,6 @@
       "depNameTemplate": "kyverno/kyverno",
       "datasourceTemplate": "github-releases"
     }
-  ],
 
-  // ── SearXNG image tag: date-based versioning, not semver ─────────────────────
-  "customManagers": [
-    {
-      "customType": "regex",
-      "fileMatch": ["searxng/values\\.yaml$"],
-      "matchStrings": [
-        "tag:\\s*\"(?<currentValue>[\\d.]+(-[a-f0-9]+)?)\""
-      ],
-      "depNameTemplate": "searxng/searxng",
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "loose"
-    }
   ]
 }

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Cloud Platform — Architecture</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f7fafc; color: #2d3748; }
+    h1 { background: linear-gradient(135deg, #2b6cb0 0%, #553c9a 100%); color: white; padding: 36px 40px; border-radius: 12px; margin-bottom: 8px; }
+    h1 span { display: block; font-size: 0.55em; font-weight: 400; opacity: 0.85; margin-top: 6px; letter-spacing: 0.5px; }
+    h2 { font-size: 1.2em; font-weight: 700; color: #2b6cb0; border-left: 4px solid #2b6cb0; padding-left: 12px; margin: 40px 0 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .section { margin: 32px 0; background: white; border-radius: 10px; padding: 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+
+    /* Business context */
+    .biz-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .biz-card { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 16px; }
+    .biz-card h3 { margin: 0 0 8px; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.5px; color: #2b6cb0; }
+    .biz-card p { margin: 0; font-size: 0.88em; color: #2d3748; line-height: 1.5; }
+
+    /* Features grid */
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .feat-card { border-radius: 8px; padding: 16px; }
+    .feat-card.green  { background: #f0fff4; border: 1px solid #9ae6b4; }
+    .feat-card.purple { background: #faf5ff; border: 1px solid #d6bcfa; }
+    .feat-card.orange { background: #fffaf0; border: 1px solid #fbd38d; }
+    .feat-card.blue   { background: #ebf8ff; border: 1px solid #bee3f8; }
+    .feat-card.red    { background: #fff5f5; border: 1px solid #feb2b2; }
+    .feat-card.teal   { background: #e6fffa; border: 1px solid #81e6d9; }
+    .feat-card h3 { margin: 0 0 10px; font-size: 0.85em; font-weight: 700; }
+    .feat-card ul { margin: 0; padding-left: 18px; font-size: 0.83em; line-height: 1.8; }
+
+    /* Deployment */
+    .dep-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .dep-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .dep-card h3 { margin: 0 0 8px; font-size: 0.82em; font-weight: 700; color: #553c9a; text-transform: uppercase; }
+    .dep-card p, .dep-card li { font-size: 0.84em; line-height: 1.7; margin: 0; }
+    .dep-card ul { padding-left: 18px; margin: 0; }
+
+    /* Status badges */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.72em; font-weight: 600; margin-left: 6px; vertical-align: middle; }
+    .badge.green  { background: #c6f6d5; color: #22543d; }
+    .badge.yellow { background: #fefcbf; color: #744210; }
+    .badge.gray   { background: #e2e8f0; color: #4a5568; }
+
+    @media (max-width: 700px) {
+      .biz-grid, .feat-grid, .dep-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Universal Cloud Platform
+  <span>AOS Homelab · Kubernetes v1.35.3 · 3-node HA · github.com/StanleyXie/Universal-Cloud-Platform</span>
+</h1>
+
+<!-- ─── 1. Business Context ──────────────────────────────────────────────── -->
+<div class="section">
+  <h2>1. Business Context</h2>
+  <div class="biz-grid">
+    <div class="biz-card">
+      <h3>Objective</h3>
+      <p>Self-hosted GitOps platform for managing homelab infrastructure and cloud resources declaratively — zero manual kubectl applies in production.</p>
+    </div>
+    <div class="biz-card">
+      <h3>Users</h3>
+      <p>Single operator (Stanley). Developer workstation → GitHub → ArgoCD → cluster. No external users.</p>
+    </div>
+    <div class="biz-card">
+      <h3>Value</h3>
+      <p>Full-stack GitOps: infrastructure as code, policy as code, multi-cloud provisioning, automated security scanning on every commit.</p>
+    </div>
+    <div class="biz-card">
+      <h3>Current Status</h3>
+      <p>All ArgoCD apps <span class="badge green">Synced</span><br>CI workflow <span class="badge green">6/6 passing</span><br>Crossplane providers <span class="badge green">Healthy</span><br>Cloudflare provider <span class="badge gray">Disabled</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 2. Data / GitOps Flow ─────────────────────────────────────────────── -->
+<div class="section">
+  <h2>2. GitOps Flow</h2>
+  <svg viewBox="0 0 1100 260" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#718096"/>
+      </marker>
+      <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#38a169"/>
+      </marker>
+      <marker id="arr-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#dd6b20"/>
+      </marker>
+    </defs>
+
+    <!-- Developer -->
+    <rect x="20" y="90" width="120" height="60" rx="8" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="1.5"/>
+    <text x="80" y="115" text-anchor="middle" font-size="12" font-weight="600" fill="#2b6cb0">Developer</text>
+    <text x="80" y="132" text-anchor="middle" font-size="10" fill="#4a5568">Workstation</text>
+
+    <!-- Arrow: dev -> github -->
+    <line x1="140" y1="120" x2="200" y2="120" stroke="#718096" stroke-width="1.5" marker-end="url(#arr)"/>
+    <text x="170" y="113" text-anchor="middle" font-size="9" fill="#718096">git push</text>
+
+    <!-- GitHub -->
+    <rect x="200" y="60" width="160" height="120" rx="8" fill="#faf5ff" stroke="#553c9a" stroke-width="1.5"/>
+    <text x="280" y="90" text-anchor="middle" font-size="12" font-weight="600" fill="#553c9a">GitHub</text>
+    <text x="280" y="108" text-anchor="middle" font-size="10" fill="#4a5568">Source of Truth</text>
+    <rect x="215" y="118" width="130" height="22" rx="4" fill="#e9d8fd"/>
+    <text x="280" y="133" text-anchor="middle" font-size="9" fill="#553c9a">security.yml CI (6 jobs)</text>
+    <rect x="215" y="144" width="130" height="22" rx="4" fill="#e9d8fd"/>
+    <text x="280" y="159" text-anchor="middle" font-size="9" fill="#553c9a">diff-preview.yml (ArgoCD diff)</text>
+
+    <!-- Renovate -->
+    <rect x="200" y="200" width="160" height="44" rx="8" fill="#fffaf0" stroke="#dd6b20" stroke-width="1.5"/>
+    <text x="280" y="220" text-anchor="middle" font-size="11" font-weight="600" fill="#dd6b20">Renovate Bot</text>
+    <text x="280" y="236" text-anchor="middle" font-size="9" fill="#4a5568">Weekly dep update PRs</text>
+    <line x1="280" y1="200" x2="280" y2="180" stroke="#dd6b20" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-orange)"/>
+
+    <!-- Arrow: github -> argocd -->
+    <line x1="360" y1="120" x2="430" y2="120" stroke="#38a169" stroke-width="2" marker-end="url(#arr-green)"/>
+    <text x="395" y="112" text-anchor="middle" font-size="9" fill="#38a169">GitOps pull</text>
+    <text x="395" y="132" text-anchor="middle" font-size="9" fill="#38a169">(webhook / 3 min)</text>
+
+    <!-- ArgoCD -->
+    <rect x="430" y="60" width="150" height="120" rx="8" fill="#f0fff4" stroke="#38a169" stroke-width="1.5"/>
+    <text x="505" y="90" text-anchor="middle" font-size="12" font-weight="600" fill="#276749">ArgoCD</text>
+    <text x="505" y="107" text-anchor="middle" font-size="10" fill="#4a5568">9.4.17 · App-of-Apps</text>
+    <text x="505" y="124" text-anchor="middle" font-size="9" fill="#4a5568">Wave 0 → 1 → 2 → 3</text>
+    <text x="505" y="140" text-anchor="middle" font-size="9" fill="#4a5568">selfHeal + prune</text>
+    <text x="505" y="157" text-anchor="middle" font-size="9" fill="#4a5568">ServerSideApply</text>
+    <text x="505" y="171" text-anchor="middle" font-size="9" fill="#4a5568">Self-managed</text>
+
+    <!-- Arrow: argocd -> cluster -->
+    <line x1="580" y1="120" x2="650" y2="120" stroke="#718096" stroke-width="2" marker-end="url(#arr)"/>
+    <text x="615" y="113" text-anchor="middle" font-size="9" fill="#718096">reconcile</text>
+
+    <!-- Cluster box -->
+    <rect x="650" y="30" width="420" height="210" rx="10" fill="#f7fafc" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="860" y="55" text-anchor="middle" font-size="11" font-weight="600" fill="#4a5568">AOS Homelab Cluster · VIP 192.168.32.10</text>
+
+    <!-- Cilium -->
+    <rect x="665" y="65" width="110" height="48" rx="6" fill="#e6fffa" stroke="#2c7a7b" stroke-width="1.2"/>
+    <text x="720" y="85" text-anchor="middle" font-size="10" font-weight="600" fill="#234e52">Cilium v1.19.2</text>
+    <text x="720" y="101" text-anchor="middle" font-size="9" fill="#4a5568">CNI · L2 ARP · GW API</text>
+
+    <!-- Kyverno -->
+    <rect x="785" y="65" width="110" height="48" rx="6" fill="#faf5ff" stroke="#6b46c1" stroke-width="1.2"/>
+    <text x="840" y="85" text-anchor="middle" font-size="10" font-weight="600" fill="#44337a">Kyverno 3.7.1</text>
+    <text x="840" y="101" text-anchor="middle" font-size="9" fill="#4a5568">15 policies · 3 replicas</text>
+
+    <!-- Crossplane -->
+    <rect x="905" y="65" width="150" height="48" rx="6" fill="#ede9fe" stroke="#553c9a" stroke-width="1.2"/>
+    <text x="980" y="85" text-anchor="middle" font-size="10" font-weight="600" fill="#44337a">Crossplane</text>
+    <text x="980" y="101" text-anchor="middle" font-size="9" fill="#4a5568">AWS · GCP · Azure · TF</text>
+
+    <!-- Gateway -->
+    <rect x="665" y="127" width="180" height="48" rx="6" fill="#e6fffa" stroke="#2c7a7b" stroke-width="1.2"/>
+    <text x="755" y="147" text-anchor="middle" font-size="10" font-weight="600" fill="#234e52">platform-gateway</text>
+    <text x="755" y="163" text-anchor="middle" font-size="9" fill="#4a5568">192.168.32.100:80 · HTTPRoute</text>
+
+    <!-- Storage -->
+    <rect x="855" y="127" width="110" height="48" rx="6" fill="#f7fafc" stroke="#718096" stroke-width="1.2"/>
+    <text x="910" y="147" text-anchor="middle" font-size="10" font-weight="600" fill="#4a5568">local-path</text>
+    <text x="910" y="163" text-anchor="middle" font-size="9" fill="#4a5568">StorageClass</text>
+
+    <!-- SearXNG -->
+    <rect x="975" y="127" width="80" height="48" rx="6" fill="#fff5f5" stroke="#c53030" stroke-width="1.2"/>
+    <text x="1015" y="147" text-anchor="middle" font-size="10" font-weight="600" fill="#742a2a">SearXNG</text>
+    <text x="1015" y="163" text-anchor="middle" font-size="9" fill="#4a5568">common-svc</text>
+
+    <!-- LAN client -->
+    <rect x="665" y="190" width="390" height="36" rx="6" fill="#fefcbf" stroke="#d69e2e" stroke-width="1.2"/>
+    <text x="860" y="213" text-anchor="middle" font-size="10" fill="#744210">LAN Client → ARP → 192.168.32.100 → HTTPRoute → SearXNG</text>
+  </svg>
+</div>
+
+<!-- ─── 3. Sync Wave Pipeline ──────────────────────────────────────────────── -->
+<div class="section">
+  <h2>3. Sync Wave Deployment Pipeline</h2>
+  <svg viewBox="0 0 1100 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="wa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0,8 3,0 6" fill="#4a5568"/>
+      </marker>
+    </defs>
+
+    <!-- Wave 0 -->
+    <rect x="20" y="20" width="220" height="160" rx="10" fill="#f0fff4" stroke="#38a169" stroke-width="2"/>
+    <text x="130" y="45" text-anchor="middle" font-size="11" font-weight="700" fill="#276749">Wave 0 — Bootstrap</text>
+    <rect x="35" y="55" width="190" height="32" rx="5" fill="#c6f6d5"/>
+    <text x="130" y="76" text-anchor="middle" font-size="10" fill="#22543d">ArgoCD 9.4.17 (self-managed)</text>
+    <rect x="35" y="93" width="190" height="32" rx="5" fill="#c6f6d5"/>
+    <text x="130" y="114" text-anchor="middle" font-size="10" fill="#22543d">Cilium v1.19.2 (CNI + L2 + GW)</text>
+    <rect x="35" y="131" width="190" height="32" rx="5" fill="#c6f6d5"/>
+    <text x="130" y="152" text-anchor="middle" font-size="10" fill="#22543d">local-path-provisioner</text>
+
+    <line x1="240" y1="100" x2="270" y2="100" stroke="#4a5568" stroke-width="2" marker-end="url(#wa)"/>
+
+    <!-- Wave 1 -->
+    <rect x="270" y="20" width="230" height="160" rx="10" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="2"/>
+    <text x="385" y="45" text-anchor="middle" font-size="11" font-weight="700" fill="#2c5282">Wave 1 — Policy &amp; Network</text>
+    <rect x="285" y="55" width="200" height="26" rx="5" fill="#bee3f8"/>
+    <text x="385" y="73" text-anchor="middle" font-size="10" fill="#2c5282">Kyverno 3.7.1 (controller)</text>
+    <rect x="285" y="86" width="200" height="26" rx="5" fill="#bee3f8"/>
+    <text x="385" y="104" text-anchor="middle" font-size="10" fill="#2c5282">Gateway API CRDs v1.2.1</text>
+    <rect x="285" y="117" width="200" height="26" rx="5" fill="#bee3f8"/>
+    <text x="385" y="135" text-anchor="middle" font-size="10" fill="#2c5282">kyverno-policies (baseline PSS)</text>
+    <rect x="285" y="148" width="200" height="26" rx="5" fill="#bee3f8"/>
+    <text x="385" y="166" text-anchor="middle" font-size="10" fill="#2c5282">kyverno-custom-policies</text>
+
+    <line x1="500" y1="100" x2="530" y2="100" stroke="#4a5568" stroke-width="2" marker-end="url(#wa)"/>
+
+    <!-- Wave 2 -->
+    <rect x="530" y="20" width="220" height="160" rx="10" fill="#fffaf0" stroke="#dd6b20" stroke-width="2"/>
+    <text x="640" y="45" text-anchor="middle" font-size="11" font-weight="700" fill="#7b341e">Wave 2 — Cloud Mgmt</text>
+    <rect x="545" y="55" width="190" height="32" rx="5" fill="#fbd38d"/>
+    <text x="640" y="76" text-anchor="middle" font-size="10" fill="#7b341e">Crossplane (control plane)</text>
+    <rect x="545" y="93" width="190" height="32" rx="5" fill="#fbd38d"/>
+    <text x="640" y="114" text-anchor="middle" font-size="10" fill="#7b341e">crossplane-providers</text>
+    <rect x="545" y="131" width="190" height="32" rx="5" fill="#fbd38d"/>
+    <text x="640" y="152" text-anchor="middle" font-size="10" fill="#7b341e">crossplane-providerconfigs</text>
+
+    <line x1="750" y1="100" x2="780" y2="100" stroke="#4a5568" stroke-width="2" marker-end="url(#wa)"/>
+
+    <!-- Wave 3 -->
+    <rect x="780" y="20" width="220" height="160" rx="10" fill="#fff5f5" stroke="#c53030" stroke-width="2"/>
+    <text x="890" y="45" text-anchor="middle" font-size="11" font-weight="700" fill="#742a2a">Wave 3 — Services</text>
+    <rect x="795" y="55" width="190" height="32" rx="5" fill="#fed7d7"/>
+    <text x="890" y="76" text-anchor="middle" font-size="10" fill="#742a2a">SearXNG (common-svc)</text>
+    <text x="890" y="93" text-anchor="middle" font-size="9" fill="#4a5568">search.aos.local → 192.168.32.100</text>
+    <rect x="795" y="107" width="190" height="32" rx="5" fill="#e2e8f0" stroke-dasharray="4,2"/>
+    <text x="890" y="128" text-anchor="middle" font-size="10" fill="#718096">Observability (pending)</text>
+    <text x="890" y="143" text-anchor="middle" font-size="9" fill="#718096">kube-prometheus-stack + Loki</text>
+  </svg>
+</div>
+
+<!-- ─── 4. System Architecture Layers ────────────────────────────────────── -->
+<div class="section">
+  <h2>4. System Architecture Layers</h2>
+  <svg viewBox="0 0 1100 380" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- Layer labels -->
+    <text x="10" y="68" font-size="10" font-weight="700" fill="#718096" transform="rotate(-90,10,68)" text-anchor="middle">SOURCE</text>
+    <text x="10" y="168" font-size="10" font-weight="700" fill="#718096" transform="rotate(-90,10,168)" text-anchor="middle">CI/CD</text>
+    <text x="10" y="268" font-size="10" font-weight="700" fill="#718096" transform="rotate(-90,10,268)" text-anchor="middle">PLATFORM</text>
+    <text x="10" y="355" font-size="10" font-weight="700" fill="#718096" transform="rotate(-90,10,355)" text-anchor="middle">INFRA</text>
+
+    <!-- Source layer -->
+    <rect x="30" y="20" width="1060" height="80" rx="8" fill="#faf5ff" stroke="#9f7aea" stroke-width="1.5"/>
+    <rect x="50" y="35" width="180" height="50" rx="6" fill="#e9d8fd"/>
+    <text x="140" y="57" text-anchor="middle" font-size="11" font-weight="600" fill="#553c9a">GitHub Repo</text>
+    <text x="140" y="73" text-anchor="middle" font-size="9" fill="#4a5568">StanleyXie/Universal-Cloud-Platform</text>
+
+    <rect x="250" y="35" width="160" height="50" rx="6" fill="#e9d8fd"/>
+    <text x="330" y="57" text-anchor="middle" font-size="11" font-weight="600" fill="#553c9a">Renovate Bot</text>
+    <text x="330" y="73" text-anchor="middle" font-size="9" fill="#4a5568">Weekly dep PRs · SHA pinning</text>
+
+    <rect x="430" y="35" width="160" height="50" rx="6" fill="#e9d8fd"/>
+    <text x="510" y="57" text-anchor="middle" font-size="11" font-weight="600" fill="#553c9a">Developer</text>
+    <text x="510" y="73" text-anchor="middle" font-size="9" fill="#4a5568">PR → review → merge</text>
+
+    <rect x="610" y="35" width="200" height="50" rx="6" fill="#e9d8fd"/>
+    <text x="710" y="57" text-anchor="middle" font-size="11" font-weight="600" fill="#553c9a">provider-upjet-cloudflare</text>
+    <text x="710" y="73" text-anchor="middle" font-size="9" fill="#718096">fork paused — awaiting crossplane-contrib release</text>
+
+    <!-- CI/CD layer -->
+    <rect x="30" y="115" width="1060" height="80" rx="8" fill="#f0fff4" stroke="#38a169" stroke-width="1.5"/>
+    <rect x="50" y="130" width="230" height="50" rx="6" fill="#c6f6d5"/>
+    <text x="165" y="152" text-anchor="middle" font-size="11" font-weight="600" fill="#276749">security.yml (GitHub-hosted)</text>
+    <text x="165" y="168" text-anchor="middle" font-size="9" fill="#4a5568">Gitleaks · yamllint · kubeconform · Kyverno · ShellCheck</text>
+
+    <rect x="300" y="130" width="230" height="50" rx="6" fill="#c6f6d5"/>
+    <text x="415" y="152" text-anchor="middle" font-size="11" font-weight="600" fill="#276749">diff-preview.yml (self-hosted)</text>
+    <text x="415" y="168" text-anchor="middle" font-size="9" fill="#4a5568">argocd app diff → PR comment · runs on aos-cluster</text>
+
+    <rect x="550" y="130" width="180" height="50" rx="6" fill="#c6f6d5"/>
+    <text x="640" y="152" text-anchor="middle" font-size="11" font-weight="600" fill="#276749">ArgoCD</text>
+    <text x="640" y="168" text-anchor="middle" font-size="9" fill="#4a5568">GitOps pull · webhook · waves 0-3</text>
+
+    <rect x="750" y="130" width="160" height="50" rx="6" fill="#c6f6d5"/>
+    <text x="830" y="152" text-anchor="middle" font-size="11" font-weight="600" fill="#276749">GH Runner (self-hosted)</text>
+    <text x="830" y="168" text-anchor="middle" font-size="9" fill="#4a5568">aos-cluster label · outbound HTTPS</text>
+
+    <!-- Platform layer -->
+    <rect x="30" y="210" width="1060" height="80" rx="8" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="1.5"/>
+    <rect x="50" y="225" width="140" height="50" rx="6" fill="#bee3f8"/>
+    <text x="120" y="247" text-anchor="middle" font-size="10" font-weight="600" fill="#2c5282">Kyverno 3.7.1</text>
+    <text x="120" y="263" text-anchor="middle" font-size="9" fill="#4a5568">Policy admission</text>
+
+    <rect x="205" y="225" width="140" height="50" rx="6" fill="#bee3f8"/>
+    <text x="275" y="247" text-anchor="middle" font-size="10" font-weight="600" fill="#2c5282">Gateway API v1.2.1</text>
+    <text x="275" y="263" text-anchor="middle" font-size="9" fill="#4a5568">HTTPRoute · GW controller</text>
+
+    <rect x="360" y="225" width="180" height="50" rx="6" fill="#bee3f8"/>
+    <text x="450" y="247" text-anchor="middle" font-size="10" font-weight="600" fill="#2c5282">Crossplane</text>
+    <text x="450" y="263" text-anchor="middle" font-size="9" fill="#4a5568">AWS · GCP · Azure · Terraform</text>
+
+    <rect x="555" y="225" width="140" height="50" rx="6" fill="#bee3f8"/>
+    <text x="625" y="247" text-anchor="middle" font-size="10" font-weight="600" fill="#2c5282">SearXNG</text>
+    <text x="625" y="263" text-anchor="middle" font-size="9" fill="#4a5568">search.aos.local</text>
+
+    <rect x="710" y="225" width="170" height="50" rx="6" fill="#e2e8f0" stroke-dasharray="4,2"/>
+    <text x="795" y="247" text-anchor="middle" font-size="10" font-weight="600" fill="#718096">Observability (pending)</text>
+    <text x="795" y="263" text-anchor="middle" font-size="9" fill="#718096">Prometheus + Loki</text>
+
+    <rect x="895" y="225" width="180" height="50" rx="6" fill="#e2e8f0" stroke-dasharray="4,2"/>
+    <text x="985" y="247" text-anchor="middle" font-size="10" font-weight="600" fill="#718096">Cloudflare Provider (pending)</text>
+    <text x="985" y="263" text-anchor="middle" font-size="9" fill="#718096">awaiting crossplane-contrib</text>
+
+    <!-- Infrastructure layer -->
+    <rect x="30" y="305" width="1060" height="60" rx="8" fill="#f7fafc" stroke="#718096" stroke-width="1.5"/>
+    <rect x="50" y="318" width="200" height="34" rx="6" fill="#e2e8f0"/>
+    <text x="150" y="337" text-anchor="middle" font-size="10" font-weight="600" fill="#4a5568">aos01  192.168.32.11  control-plane</text>
+
+    <rect x="265" y="318" width="200" height="34" rx="6" fill="#e2e8f0"/>
+    <text x="365" y="337" text-anchor="middle" font-size="10" font-weight="600" fill="#4a5568">aos02  192.168.32.12  control-plane</text>
+
+    <rect x="480" y="318" width="230" height="34" rx="6" fill="#e2e8f0"/>
+    <text x="595" y="337" text-anchor="middle" font-size="10" font-weight="600" fill="#4a5568">aos03  192.168.32.13  control-plane + worker</text>
+
+    <rect x="725" y="318" width="200" height="34" rx="6" fill="#c6f6d5"/>
+    <text x="825" y="337" text-anchor="middle" font-size="10" font-weight="600" fill="#276749">kube-vip VIP  192.168.32.10</text>
+
+    <rect x="940" y="318" width="135" height="34" rx="6" fill="#bee3f8"/>
+    <text x="1007" y="337" text-anchor="middle" font-size="10" font-weight="600" fill="#2c5282">Cilium v1.19.2  eBPF</text>
+  </svg>
+</div>
+
+<!-- ─── 5. Features ────────────────────────────────────────────────────────── -->
+<div class="section">
+  <h2>5. Features</h2>
+  <div class="feat-grid">
+    <div class="feat-card green">
+      <h3>GitOps — ArgoCD</h3>
+      <ul>
+        <li>App-of-Apps pattern, waves 0–3</li>
+        <li>Self-managed ArgoCD (prune: false)</li>
+        <li>Multi-source Helm + values ref</li>
+        <li>ServerSideApply for large CRDs</li>
+        <li>selfHeal + automated prune</li>
+        <li>Webhook / 3-min poll sync</li>
+      </ul>
+    </div>
+    <div class="feat-card purple">
+      <h3>Policy — Kyverno</h3>
+      <ul>
+        <li>Baseline Pod Security Standards</li>
+        <li>Custom: resource limits, no default NS</li>
+        <li>restrict-external-ips (CVE-2020-8554)</li>
+        <li>require-crossplane-labels</li>
+        <li>PolicyExceptions for system NS</li>
+        <li>All policies: Audit mode initially</li>
+      </ul>
+    </div>
+    <div class="feat-card blue">
+      <h3>Networking — Cilium + Gateway API</h3>
+      <ul>
+        <li>eBPF dataplane, kube-proxy replacement</li>
+        <li>Gateway API v1.2.1 (replaces Ingress)</li>
+        <li>Bare-metal L2 ARP LoadBalancer IPs</li>
+        <li>IP pool: 192.168.32.100–110</li>
+        <li>HTTPRoute for service exposure</li>
+        <li>Supplemental RBAC fix for v1.19.2</li>
+      </ul>
+    </div>
+    <div class="feat-card orange">
+      <h3>Cloud Management — Crossplane</h3>
+      <ul>
+        <li>Providers: AWS, GCP, Azure, Terraform</li>
+        <li>DeploymentRuntimeConfig (not deprecated ControllerConfig)</li>
+        <li>ProviderConfigs via K8s Secrets</li>
+        <li>Cloudflare: pending official xpkg</li>
+        <li>Multi-cloud IaC from cluster</li>
+      </ul>
+    </div>
+    <div class="feat-card teal">
+      <h3>CI/CD Pipeline</h3>
+      <ul>
+        <li>Gitleaks: secret scanning (full history)</li>
+        <li>yamllint: YAML style enforcement</li>
+        <li>kubeconform: K8s schema validation</li>
+        <li>Kyverno apply: policy syntax check</li>
+        <li>ShellCheck: script analysis</li>
+        <li>ArgoCD diff preview on PRs</li>
+        <li>Renovate: automated dep updates</li>
+      </ul>
+    </div>
+    <div class="feat-card red">
+      <h3>Services &amp; Pending</h3>
+      <ul>
+        <li>SearXNG — private search, search.aos.local</li>
+        <li><em>Pending:</em> Observability (Prometheus + Loki)</li>
+        <li><em>Pending:</em> Cloud credentials setup</li>
+        <li><em>Pending:</em> Cloudflare provider</li>
+        <li><em>Pending:</em> TLS on platform-gateway</li>
+        <li><em>Pending:</em> ArgoCD SSO / OIDC</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 6. Deployment ─────────────────────────────────────────────────────── -->
+<div class="section">
+  <h2>6. Deployment &amp; Operations</h2>
+  <div class="dep-grid">
+    <div class="dep-card">
+      <h3>Day-0 Bootstrap (run once)</h3>
+      <ul>
+        <li><code>bootstrap/k8s/prep-node.sh</code> — OS prep on each NUC</li>
+        <li><code>bootstrap/k8s/init-control-plane.sh</code> — kubeadm init aos01</li>
+        <li><code>bootstrap/k8s/join-control-plane.sh</code> — join aos02/03</li>
+        <li><code>bootstrap/bootstrap-argocd.sh</code> — Helm install ArgoCD + apply root app</li>
+        <li>ArgoCD reconciles all waves automatically</li>
+      </ul>
+    </div>
+    <div class="dep-card">
+      <h3>Day-2 Operations</h3>
+      <ul>
+        <li>All changes via PR → merge → ArgoCD sync</li>
+        <li>Renovate opens dependency PRs every weekend</li>
+        <li>ArgoCD diff preview on every manifest PR</li>
+        <li><code>scripts/setup-credentials.sh</code> — cloud provider secrets</li>
+        <li><code>scripts/setup-searxng-secret.sh</code> — SearXNG key rotation</li>
+      </ul>
+    </div>
+    <div class="dep-card">
+      <h3>Access Points</h3>
+      <ul>
+        <li>ArgoCD UI: <code>https://192.168.32.11:30843</code></li>
+        <li>SearXNG: <code>http://search.aos.local</code></li>
+        <li>Platform Gateway: <code>192.168.32.100:80</code></li>
+        <li>kubectl: <code>~/.kube/config</code> (merged)</li>
+        <li>SSH: <code>ssh stanley@192.168.32.11</code></li>
+      </ul>
+    </div>
+    <div class="dep-card">
+      <h3>Repository Structure</h3>
+      <ul>
+        <li><code>apps/</code> — ArgoCD App-of-Apps manifests</li>
+        <li><code>*/values.yaml</code> — Helm values per component</li>
+        <li><code>kyverno-custom-policies/</code> — ClusterPolicies + exceptions</li>
+        <li><code>gateway-api/</code> — CRDs + Gateway + L2 pool + RBAC fix</li>
+        <li><code>crossplane-providers/</code> — Provider CRs</li>
+        <li><code>scripts/</code> — setup helpers (not in GitOps loop)</li>
+        <li><code>bootstrap/</code> — Day-0 cluster setup</li>
+        <li><code>docs/</code> — plans, issues, architecture</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center; color:#a0aec0; font-size:0.78em; margin-top:40px;">
+  Universal Cloud Platform · Generated 2026-04-06 · github.com/StanleyXie/Universal-Cloud-Platform
+</p>
+
+</body>
+</html>

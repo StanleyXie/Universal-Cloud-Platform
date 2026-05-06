@@ -9,6 +9,7 @@ A self-hosted GitOps platform for managing homelab infrastructure and cloud reso
 The live architecture diagram and system overview can be found here:
 **[https://stanleyxie.github.io/Universal-Cloud-Platform/](https://stanleyxie.github.io/Universal-Cloud-Platform/)**
 
+For more details of architecture, please refer to [Architecture Overview](docs/plans/2026-04-05-architecture-overview.md) 
 ---
 
 ## 🏗️ System Overview

@@ -1,0 +1,29 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-argocd-ssa
+  annotations:
+    policies.kyverno.io/title: Require ArgoCD Server-Side Apply
+    policies.kyverno.io/category: GitOps Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      To prevent issues with large manifests (like CRDs) exceeding the 262KB 
+      annotation limit, all ArgoCD Applications must have ServerSideApply=true 
+      enabled in their syncOptions.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-ssa-enabled
+      match:
+        any:
+          - resources:
+              kinds:
+                - argoproj.io/v1alpha1/Application
+      validate:
+        message: "ArgoCD Application must have 'ServerSideApply=true' enabled in syncOptions."
+        pattern:
+          spec:
+            syncPolicy:
+              syncOptions:
+                - "ServerSideApply=true"

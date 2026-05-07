@@ -52,3 +52,11 @@ This repository follows a "Wave-based" deployment strategy:
 - **Wave 2**: Cloud Management (Crossplane)
 - **Wave 3**: Services (SearXNG, Observability)
 
+---
+
+## 🔮 Future Optimizations (TBD)
+
+- **Remove Helm from GitOps Loop**: Transition from Helm-in-ArgoCD to a "Hydrated Manifests" pattern (separation of rendering and reconciliation).
+- **Service Mesh Hardening**: Implement `CiliumNetworkPolicy` for L7 visibility and enable mTLS.
+- **Observability Stack**: Deploy kube-prometheus-stack and Loki for centralized logging and metrics.
+- **Cluster Backup**: Implement Velero or automated etcd snapshots for disaster recovery.

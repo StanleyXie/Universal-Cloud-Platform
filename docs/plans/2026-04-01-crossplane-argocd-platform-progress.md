@@ -311,3 +311,4 @@ kubectl -n argocd annotate app <app-name> argocd.argoproj.io/refresh=hard --over
 - [ ] Re-enable Cloudflare provider when official release ships
 - [ ] Observability stack (kube-prometheus-stack + Loki)
 - [ ] Set up etcd backup / Velero
+- [ ] Remove Helm from GitOps Loop (Transition to Hydrated Manifests pattern)

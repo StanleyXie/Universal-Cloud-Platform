@@ -16,7 +16,7 @@ jobs:
     name: Secret Detection (Gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0  # full history required by gitleaks
 
@@ -30,7 +30,7 @@ jobs:
     name: YAML Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install yamllint
         run: pip install yamllint
@@ -53,7 +53,7 @@ jobs:
     name: Manifest Validation (kubeconform)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install kubeconform
         run: |
@@ -81,7 +81,7 @@ jobs:
     name: Kyverno Policy Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install Kyverno CLI
         run: |
@@ -104,7 +104,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@master
@@ -117,7 +117,7 @@ jobs:
     name: ArgoCD Application Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install kubeconform
         run: |

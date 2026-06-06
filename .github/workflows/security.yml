@@ -58,7 +58,7 @@ jobs:
       - name: Install kubeconform
         run: |
           curl -sSLo kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
           tar -xzf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
 
@@ -122,7 +122,7 @@ jobs:
       - name: Install kubeconform
         run: |
           curl -sSLo kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
           tar -xzf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
 

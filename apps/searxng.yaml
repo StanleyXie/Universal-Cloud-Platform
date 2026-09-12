@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: https://unknowniq.github.io/helm-charts/
       chart: searxng
-      targetRevision: "0.1.10"
+      targetRevision: "0.1.14"
       helm:
         valueFiles:
           - $values/searxng/values.yaml

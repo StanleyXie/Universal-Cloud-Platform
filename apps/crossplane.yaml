@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: https://charts.crossplane.io/stable
       chart: crossplane
-      targetRevision: "1.*"
+      targetRevision: "2.*"
       helm:
         valueFiles:
           - $values/crossplane/values.yaml
